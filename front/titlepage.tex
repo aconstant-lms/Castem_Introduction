@@ -1,0 +1,68 @@
+%======================================================================
+%  Title page, in the same layout as the "Nonlinear Problems in
+%  Mechanics" notes: two gray rules around a large sans-serif bold
+%  title, author and laboratory below, a small emblem of the running
+%  example of the book, and the date.
+%
+%  The emblem is the quarter plate with a hole of Chapter 2, with the
+%  symmetry conditions in blue (kinematic data) and the loaded edge in
+%  green (static data) -- the same colour convention as the Tonti
+%  diagrams of the companion notes.
+%======================================================================
+\begin{titlepage}
+\sffamily\setlength{\parindent}{0pt}
+\null\vspace{3.2cm}
+{\color{gray!70!black}\rule{\textwidth}{0.8pt}}\par\vspace{18pt}
+{\fontsize{30}{36}\selectfont\bfseries Introduction to \texttt{Cast3M}\\[4pt]
+ programming\par}
+\vspace{14pt}
+{\LARGE Lecture notes\par}
+\vspace{18pt}
+{\color{gray!70!black}\rule{\textwidth}{0.8pt}}\par
+\vspace{2.4cm}
+{\Large Andrei Constantinescu\par}
+\vspace{6pt}
+{\normalsize\texttt{andrei.constantinescu@polytechnique.edu}\par}
+\vspace{10pt}
+{\normalsize Laboratoire de M\'ecanique des Solides\\
+CNRS UMR 7649, \'Ecole Polytechnique\\
+Institut Polytechnique de Paris, 91120 Palaiseau\par}
+\vfill
+\begin{center}
+\begin{tikzpicture}[scale=0.75,>=Stealth]
+  % the quarter plate with a hole: the running example of Chapter 2
+  \begin{scope}
+    \clip (0,0) rectangle (4,2.6);
+    \fill[gray!10] (0,0) rectangle (4,2.6);
+    \fill[white] (0,0) circle (1.1);
+    \draw[gray!45,thin] (0,0) circle (1.1);
+    % a coarse structured mesh, radial and circumferential
+    \foreach \a in {0,15,...,90}
+      \draw[gray!45,thin] (\a:1.1) -- (\a:4.8);
+    \foreach \r in {1.6,2.2,2.8,3.4,4.0}
+      \draw[gray!45,thin] (0:\r) arc (0:90:\r);
+  \end{scope}
+  % the free top edge, and the hole
+  \draw[gray!55,thin] (0,2.6) -- (4,2.6);
+  % symmetry conditions (kinematic data) in blue
+  \draw[line width=1.6pt,cu] (1.1,0) -- (4,0);
+  \draw[line width=1.6pt,cu] (0,1.1) -- (0,2.6);
+  % loaded edge (static data) in green
+  \draw[line width=1.6pt,cphi] (4,0) -- (4,2.6);
+  \foreach \y in {0.25,0.65,...,2.55}
+    \draw[->,cphi] (4.15,\y) -- (4.75,\y);
+\end{tikzpicture}
+\end{center}
+\vspace{0.9cm}
+\begin{small}
+\textbf{Work in progress.} These notes are being written and rewritten as the
+lectures they accompany evolve, and they are certainly not free of errors --
+in the text, in the equations, and in the \textsc{gibiane} examples. Please
+send corrections, comments and suggestions to the author at the address
+above: they are genuinely welcome, and they are what makes the next version
+better than this one.
+\end{small}
+\par\vspace{10pt}
+{\small Draft -- \today\par}
+\end{titlepage}
+\cleardoublepage

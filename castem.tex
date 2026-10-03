@@ -1,267 +1,44 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%======================================================================
+%  Introduction to Cast3M programming -- Lecture notes
+%  A. Constantinescu, LMS, CNRS UMR 7649 & Ecole Polytechnique
 %
-%  Introduction to Cast3M programming
-%  Andrei Constantinescu -- LMS, CNRS UMR 7649, Ecole Polytechnique
+%  Build:  latexmk -pdf castem    (runs pdflatex, bibtex and makeindex as
+%          needed; .latexmkrc passes the index style file).  By hand:
+%            pdflatex castem
+%            bibtex castem
+%            makeindex -s preamble/index.ist castem
+%            pdflatex castem ; pdflatex castem
+%  Work on one chapter: uncomment the \includeonly line.
 %
-%  Build:   latexmk -pdf castem        (runs pdflatex/bibtex/makeindex as needed)
-%  or:      pdflatex castem ; bibtex castem ; makeindex castem ; pdflatex castem
-%
-%  ---------------------------------------------------------------------------
-%  ENCODING.  All .tex sources in this directory are UTF-8.  They used to be
-%  a mixture of latin-1 and ASCII, which is what produced the mojibake
-%  ("Ã©" for "é") and the "Unicode character not set up for use with LaTeX"
-%  errors.  If you edit a file, keep it UTF-8.  To check:
-%      file *.tex                    (should say "UTF-8 text" everywhere)
+%  ---------------------------------------------------------------------
+%  ENCODING.  All .tex sources in this directory are UTF-8.  They used to
+%  be a mixture of latin-1 and ASCII, which is what produced the mojibake
+%  ("Ã©" for "é") and the "Unicode character not set up for use with
+%  LaTeX" errors.  If you edit a file, keep it UTF-8.  To check:
+%      file *.tex                 (should say "UTF-8 text" everywhere)
 %  To convert a stray latin-1 file:
 %      iconv -f ISO-8859-1 -t UTF-8 file.tex -o file.tex.new && mv ...
-%  ---------------------------------------------------------------------------
+%  ---------------------------------------------------------------------
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  The layout and the typography are shared with the companion notes
+%  "Nonlinear Problems in Mechanics": see preamble/style.tex.
+%======================================================================
+\documentclass[11pt,a4paper,twoside,openright]{book}
 
-\documentclass[english,11pt]{book}
+\input{preamble/style}
+\input{preamble/notation}
 
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-% "english" is also a global option on \documentclass, so the main language
-% has to be named explicitly -- otherwise babel takes the last one it
-% processes (french) and you get French spacing and em-dash lists in an
-% English book.  Use \begin{otherlanguage}{french} ... for French passages.
-\usepackage[main=english,french]{babel}
-\usepackage{graphicx,verbatim}
-\usepackage{xcolor}
-\usepackage{amsmath,amssymb}
-\usepackage{makeidx,placeins}
-\usepackage{array}
-\usepackage{enumitem}
-\usepackage[expansion=false]{microtype}   % cmtt is a bitmap font here, so
-                                         % font expansion has to stay off
+\draftfalse      % \drafttrue shows the red [notes to the author]
 
-\usepackage{mathptmx}                % Times text + matching maths
-                                     % (replaces the obsolete "times" package,
-                                     %  which left the maths in Computer Modern)
-\usepackage[scaled=0.92]{helvet}     % Helvetica for the sans family, i.e. for
-                                     % the headings below -- \sffamily is used
-                                     % nowhere else in the document.  Helvetica
-                                     % runs large next to Times, hence the
-                                     % 0.92 scaling.
-
-\usepackage[colorlinks=true,linkcolor=linknavy,citecolor=linknavy,
-            urlcolor=linknavy,breaklinks=true]{hyperref}
-\usepackage{url}
-\usepackage{xurl}        % lets long query-string URLs break anywhere
-
-\setlength{\topmargin}{-10.mm}
-\setlength{\textwidth}{170.mm}
-\setlength{\textheight}{220.mm}
-\setlength{\parindent}{0.5cm}
-\setlength{\oddsidemargin}{0.cm}
-\setlength{\evensidemargin}{0.cm}
-
-\setlength{\emergencystretch}{3em}   % keeps long paths/URLs inside the margin
-\Urlmuskip=0mu plus 1mu\relax
-
-\renewcommand{\ttdefault}{cmtt}
-
-
-\newcommand{\bfm}[1]{\mbox{\boldmath $#1$}}
-\newcommand{\tr}{\mbox{\rm{tr}}}
-\newcommand{\dev}{\mbox{\rm{dev}}}
-\DeclareMathOperator*{\argmin}{arg\;min}
-
-\newcommand{\derp}[2]{\frac{\partial #1}{\partial #2}}
-
-\newcommand{\vect}[1]{\underline{#1}}
-\newcommand{\tens}[1]{\underline{\underline{{#1}}}}
-\newcommand{\tenq}[1]{\pmb{#1}}
-
-\newcommand{\grad}{\text{grad}\,}
-\newcommand{\ddiv}{\text{div}\,}
-\newcommand{\mexp}{\text{exp}\,}
-
-\newcommand{\bcddot}{\, \bfm{:} \,}
-\newcommand{\bcdot}{\, \bfm{\cdot} \,}
-
-\newcommand{\jump}[1]{\lbrack\!\lbrack #1 \rbrack\!\rbrack}
-\newcommand{\norm}[1]{|\!| #1 |\!|}
-\newcommand{\abs}[1]{| #1 |}
-\newcommand{\func}[1]{\mbox{\rm #1}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Index macros
-%
-%  The index is a double-entry index: each gibiane operator is listed under
-%  its own name followed by its english meaning, and again under the english
-%  meaning followed by the operator.
-%
-%     \dindex{cerc[le]}{circle}  ->  cerc[le] (circle), 12
-%                                    circle cerc[le], 12
-%     \sindex{pasapas}           ->  pasapas, 34
-%
-%  The sort keys ("#1 #2d@...") keep the operator entries next to each other.
-%  Note: the braces in \index{...} must be balanced, and a bare "[" is fine
-%  but a "!" or "@" inside the visible text has to be escaped with ".
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newcommand{\dindex}[2]{%
-\index{#1 #2d@\texttt{#1} (#2)}%
-\index{#2 #1@#2 \texttt{#1}}%
-}
-
-\newcommand{\sindex}[1]{%
-\index{#1d@\texttt{#1}}%
-}
-
-% \cindex{...} indexes a CONCEPT rather than an operator, in roman type.
-%  \dindex and \sindex both typeset their entry in \texttt, which is right for
-%  an operator name and wrong for "imperfection sensitivity".  Same sorting
-%  convention as the others, so the three interleave correctly.
-%     \cindex{buckling}                        -> buckling, 43
-%     \cindex[theta-method]{$\theta$-method}   -> sorts as "theta-method"
-%  The optional argument is the sort key, needed whenever the visible text
-%  starts with maths or a symbol.
-%
-%  NOTE on makeindex's three special characters, @ ! and |: in the VISIBLE
-%  part of any of these three macros they must be escaped with a double
-%  quote, as in \sindex{"@excel1}.  An unescaped @ is read as a sort-key
-%  separator and makeindex rejects the entry.
-\makeatletter
-\newcommand{\cindex}[2][]{%
-\def\cidx@sort{#1}%
-\ifx\cidx@sort\@empty \index{#2@#2}\else \index{#1@#2}\fi
-}
-\makeatother
-
-%%% section headings (unchanged house style) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\makeatletter
-\renewcommand{\chapter}{\@startsection
-{chapter}%                      % the name
-{0}%                            % the level
-{20mm}%                         % the indent
-{2.5 \baselineskip}%            % the beforeskip
-{4.5 \baselineskip}%            % the afterskip
-{\normalfont\Huge\bfseries\sffamily}}% % the style
-\renewcommand{\section}{\@startsection
-{section}%                      % the name
-{0}%                            % the level
-{0mm}%                          % the indent
-{1.5 \baselineskip}%            % the beforeskip
-{1.5 \baselineskip}%            % the afterskip
-{\normalfont\Large\bfseries\sffamily}}% % the style
-\renewcommand{\subsection}{\@startsection
-{subsection}%                      % the name
-{1}%                            % the level
-{5mm}%                          % the indent
-{\baselineskip}%                % the beforeskip
-{\baselineskip}%                % the afterskip
-{\normalfont\large\bfseries\sffamily}}   % the style
-\renewcommand{\subsubsection}{\@startsection
-{subsubsection}%                      % the name
-{2}%                            % the level
-{10mm}%                         % the indent
-{0.5 \baselineskip}%            % the beforeskip
-{0.5 \baselineskip}%            % the afterskip
-{\normalfont\large\bfseries\sffamily}}   % the style
-\makeatother
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  Colours and the two-column "comment | commands" example layout
-%
-%  Every worked example in this book is a pair
-%
-%      \begin{castemcom}   ... explanation ...        \end{castemcom}
-%      \begin{castemlines} \begin{verbatim} ... \end{verbatim} \end{castemlines}
-%
-%  which typesets as:  explanation on the left, gibiane commands in a light
-%  gray box on the right.  Keep the two environments adjacent, with NO blank
-%  line between them, otherwise they end up one below the other.
-%
-%  The widths used to be 57mm + 70mm = 127mm inside a 170mm text block, so
-%  40mm of the line was wasted and long command lines ran out of the box.
-%  They are now 70mm + 92mm, which fits the text block and holds a 60-column
-%  gibiane line (the language itself allows up to 72 characters per line).
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\definecolor{Gray}{gray}{.80}        % operator tables (unchanged)
-\definecolor{CodeGray}{gray}{.92}    % background of the command boxes
-\definecolor{linknavy}{rgb}{0,0,.5}
-
-\newlength{\castemcomwidth}   \setlength{\castemcomwidth}{70.mm}
-\newlength{\castemlineswidth} \setlength{\castemlineswidth}{92.mm}
-
-% The commands are captured in a save box first.  That detour is what makes
-% it legal to put a verbatim environment inside a coloured box: the body of
-% an lrbox is typeset, not read as a macro argument.
-\newsavebox{\castemsavebox}
-
-\newenvironment{castemlines}
-{\begin{lrbox}{\castemsavebox}%
- \begin{minipage}[t]{\dimexpr\castemlineswidth-2\fboxsep\relax}%
- \begin{small}}
-{\end{small}%
- \end{minipage}%
- \end{lrbox}%
- \colorbox{CodeGray}{\usebox{\castemsavebox}}%
- \par\medskip\noindent}
-
-\newenvironment{castemcom}
-{\par\vspace*{3.mm}%
- \noindent
- \begin{minipage}[t]{\castemcomwidth}%
- \begin{small}}
-{\end{small}%
- \end{minipage}%
- \hspace*{4.mm}}
-
-% Boxed summary table of operators, as used throughout the chapters:
-%   \begin{optable}{Title}  a & b \\  \end{optable}
-%
-% The box is built in a save box because the braces of \fcolorbox cannot be
-% split between the begin-code and the end-code of a \newenvironment: each
-% piece has to be brace-balanced on its own.
-\newsavebox{\optablebox}
-\newenvironment{optable}[1]
-{\begin{lrbox}{\optablebox}%
- \begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{95mm}@{\hspace{2mm}}}
- \multicolumn{2}{c}{\textbf{#1}} \\[2.mm]}
-{\end{tabular}%
- \end{lrbox}%
- \begin{center}\fcolorbox{black}{Gray}{\usebox{\optablebox}}\end{center}}
-
-% Full-width grey code box, for shell commands and for the Python and gmsh
-% listings that have no facing comment.  Same save-box trick as castemlines:
-% a verbatim body cannot be the argument of \colorbox.
-\newsavebox{\codeboxsave}
-\newenvironment{codebox}
-{\par\medskip\begin{lrbox}{\codeboxsave}%
- \begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}%
- \begin{small}}
-{\end{small}%
- \end{minipage}%
- \end{lrbox}%
- \noindent\colorbox{CodeGray}{\usebox{\codeboxsave}}%
- \par\medskip}
-
-% Short cut for an operator name in the running text
-\newcommand{\op}[1]{\texttt{#1}}
-
-% Marks a place where the original manuscript only referred to an equation
-% of the lecture notes.  Replace these as you fill them in; grep for them:
-%     grep -n 'todoeq' ch_*.tex
-\newcommand{\todoeq}[1]{%
-  \ifmmode\text{\color{gray}\itshape[#1]}\else{\color{gray}\itshape[#1]}\fi}
-
-%\includeonly{ch_title,ch_introduction}
-
-\makeindex
+%\includeonly{ch_introduction}
 
 \begin{document}
 
-\include{ch_title}
+\frontmatter
+\input{front/titlepage}
+{\hypersetup{linkcolor=black}\tableofcontents}
 
-\tableofcontents
-
+\mainmatter
 \include{ch_introduction}
 \include{ch_meshing}
 \include{ch_elasticity}
@@ -273,6 +50,7 @@
 \include{ch_python}
 \include{ch_questions}
 
+\backmatter
 \cleardoublepage
 \phantomsection
 \addcontentsline{toc}{chapter}{Bibliography}

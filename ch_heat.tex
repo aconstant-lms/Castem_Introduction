@@ -1,8 +1,7 @@
-\chapter{\textbf{Parabolic and hyperbolic problems: transient analysis}}
+\chapter{Parabolic and hyperbolic problems: transient analysis}
 \label{chap:heat}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 This chapter adds time. We take the heat conduction equations in the
 transient regime and study the heating of the plate with a hole, then do the
@@ -367,40 +366,41 @@ fin boucle;
 \end{verbatim}
 \end{castemlines}
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
-Adding time to a problem does not change the operators, only what you do with
-them. Both algorithms in this chapter have the same shape: assemble the
-constant matrices once outside the loop, keep the history in a \op{table}
-indexed by step number, and solve one linear system per step. The only
-matrix that is factorised is the one multiplying the unknown at $n+1$, which
-is why a constant time step is worth having.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{Adding time changes the loop, not the operators.} Both
+  algorithms in this chapter have the same shape: assemble the constant
+  matrices once outside the loop, keep the history in a \op{table} indexed
+  by step number, and solve one linear system per step.
+  \item \textbf{A constant time step is worth having.} The only matrix that
+  is factorised is the one multiplying the unknown at $n+1$; keep the step
+  constant and it is factorised once.
+  \item \textbf{Two parameters decide whether the result means anything}:
+  the scheme parameters -- $\theta$ for the heat equation,
+  $(\beta,\gamma)$ for Newmark -- and the time step. $\theta\ge1/2$ and
+  $\gamma=1/2$, $\beta=1/4$ are unconditionally stable and are the defaults
+  to use until you have a reason not to.
+  \item \textbf{Stability is not accuracy.} An over-large step gives a
+  smooth, plausible and wrong answer.
+\end{itemize}
+\end{gbox*}
 
-The two parameters that decide whether the result means anything are the
-scheme parameters -- $\theta$ for the heat equation, $(\beta,\gamma)$ for
-Newmark -- and the time step. $\theta\ge1/2$ and $\gamma=1/2$, $\beta=1/4$
-are unconditionally stable and are the defaults to use until you have a
-reason not to; stability, however, is not accuracy, and an over-large step
-gives a smooth, plausible and wrong answer.
+\framepart{Exercises}
 
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
-
-\begin{enumerate}
-\item \textbf{Stability of the $\theta$-scheme.} Rerun the transient thermal
+\exercise{Stability of the $\theta$-scheme} Rerun the transient thermal
   computation with $\theta=0$ (explicit Euler) and increase $\Delta t$ until
   the solution oscillates. Compare the critical step with the theoretical
   stability limit. Then repeat with $\theta=1/2$ and $\theta=1$ and verify
   that no such limit exists.
 
-\item \textbf{Energy conservation in Newmark.} For the bar with no applied
+\exercise{Energy conservation in Newmark} For the bar with no applied
   load after the initial pulse, compute at each step the kinetic energy
   $\tfrac12 \dot{U}^{T}M\dot{U}$ and the elastic energy
   $\tfrac12 U^{T}KU$, and plot their sum. Verify that it is conserved for
   $\gamma=1/2$ and dissipated for $\gamma>1/2$.
 
-\item \textbf{Wave propagation.} Plot the displacement of the free end of the
+\exercise{Wave propagation} Plot the displacement of the free end of the
   bar against time and identify the round-trip travel time of the wave.
   Compare with $2L/c$.
-\end{enumerate}

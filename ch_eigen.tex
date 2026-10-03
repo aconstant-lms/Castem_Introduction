@@ -1,8 +1,7 @@
-\chapter{\textbf{Eigenvalue problems: vibrations and buckling}}
+\chapter{Eigenvalue problems: vibrations and buckling}
 \label{chap:eigen}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 The two previous chapters solved $KU=F$: given a load, find the response.
 This chapter asks a different question -- for which loads, or at which
@@ -349,8 +348,7 @@ mess 'first frequency under load: '
 \end{verbatim}
 \end{castemlines}
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
 Both problems are built from the matrices of chapter~\ref{chap:elasticity}
 plus one more:
@@ -367,47 +365,52 @@ mode shape         & \texttt{.'DEFORMEE\_MODALE'} & \texttt{.'DEPL'} \\
 \end{tabular}
 \end{center}
 
-\noindent Four things to carry away. Check the restraints with
-\op{ense[mble]} first: both methods need to know how many rigid body motions
-survive, and neither complains if the answer is wrong. A shell needs
-\op{cara} with its thickness, passed everywhere the material is.
-\op{ksigma} needs \texttt{'FLAM'}. And an eigenvalue computation is linear: it gives the
-bifurcation point of the \emph{perfect} structure, which for
-imperfection-sensitive shells can be well above the real collapse load.
-Chapter~\ref{chap:largestrain} shows how to follow the post-buckling path
-instead.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{Check the restraints first}, with \op{ense[mble]}. Both
+  methods need to know how many rigid body motions survive, and neither
+  complains if the answer is wrong.
+  \item \textbf{A shell needs its thickness}: \op{cara}, passed everywhere
+  the material is.
+  \item \textbf{\op{ksigma} needs \texttt{'FLAM'}}, which is what turns the
+  stress field into the geometric stiffness rather than a stress stiffening
+  term.
+  \item \textbf{An eigenvalue computation is linear.} It gives the
+  bifurcation point of the \emph{perfect} structure, which for
+  imperfection-sensitive shells can be well above the real collapse load.
+  Chapter~\ref{chap:largestrain} shows how to follow the post-buckling path
+  instead.
+\end{itemize}
+\end{gbox*}
 
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+\framepart{Exercises}
 
-\begin{enumerate}
-\item \textbf{Euler's column.} Mesh a cantilever beam with \op{coq2} elements
+\exercise{Euler's column} Mesh a cantilever beam with \op{coq2} elements
   and compute its first buckling load. Compare with
   $N_{cr}=\pi^{2}EI/(4L^{2})$. Then repeat with both ends pinned and with both
   clamped, and check that the critical loads are in the ratio $1:4:16$
   predicted by the effective lengths $2L$, $L$ and $L/2$. The shipped example
   \texttt{flam1.dgibi} is the model to start from.
 
-\item \textbf{Modes of the cylinder.} Compute the twenty lowest modes of the
+\exercise{Modes of the cylinder} Compute the twenty lowest modes of the
   clamped cylinder and sort them by the number of circumferential lobes.
   Which has the lowest frequency, and why is it not the one with the simplest
   shape? Refine the mesh and identify which modes have converged.
 
-\item \textbf{The cooling tower.} Compute the first modes of the hyperbolic
+\exercise{The cooling tower} Compute the first modes of the hyperbolic
   paraboloid of section~\ref{sec:mesh:revolution}, clamped at the base and
   free at the top. How does the lowest frequency change with the twist angle
   \op{alph}, at constant height and constant base radius? This is the
   structural reason for the shape.
 
-\item \textbf{Frequency against load.} Sweep the axial load on the cylinder
+\exercise{Frequency against load} Sweep the axial load on the cylinder
   from zero to the critical value in ten steps, computing the first frequency
   at each. Plot $f_{1}^{2}$ against the load. The result should be close to a
   straight line hitting zero at the buckling load -- explain why, from
   \eqref{eq:eigen:vibr} and \eqref{eq:eigen:flam}.
 
-\item \textbf{Imperfection sensitivity.} Add to the cylinder mesh a small
+\exercise{Imperfection sensitivity} Add to the cylinder mesh a small
   geometric imperfection in the shape of its first buckling mode, with an
   amplitude of a fraction of the thickness, using \op{plus} as in
   section~\ref{sec:mesh:deform}. Recompute the buckling load. How fast does
   it fall as the amplitude grows?
-\end{enumerate}

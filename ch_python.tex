@@ -1,8 +1,7 @@
-\chapter{\textbf{Pre- and post-processing}}
+\chapter{Pre- and post-processing}
 \label{chap:python}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 \cindex{post-processing, in Python}\sindex{"@excel1}%
 \cindex{Python}\cindex{matplotlib}\cindex{pandas}\cindex{pyvista}%
@@ -322,9 +321,9 @@ group names:
 import meshio
 
 m = meshio.read("plate.med")
-print([(c.type, len(c.data)) for c in m.cells])    # [('line', 50), ('triangle', 390)]
-print(m.cell_data["cell_tags"])                     # group numbers
-print(m.cell_tags)                                  # {-1: ['BAS'], -5: ['TROU'], ...}
+print([(c.type, len(c.data)) for c in m.cells])   # [('line',50),('triangle',390)]
+print(m.cell_data["cell_tags"])                  # group numbers
+print(m.cell_tags)                               # {-1:['BAS'], -5:['TROU'], ...}
 
 meshio.write("plate.vtu", m)                        # convert to anything else
 \end{verbatim}
@@ -515,10 +514,8 @@ a parameter sweep is reduced to a single file ready for plotting.
 
 \subsection*{Which tool for which job}
 
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{5mm}}p{92mm}@{\hspace{2mm}}}
-\multicolumn{2}{c}{\textbf{Choosing between them}} \\[2.mm]
+\begin{gbox}{Choosing between them}
+\begin{tabular}{@{}>{\ttfamily}l@{\hspace{5mm}}p{124mm}@{}}
 sed    & substitute text in a file. Use it to inject parameters into a
          template, and for nothing else -- it has no arithmetic \\[1.mm]
 awk    & column arithmetic and reformatting: extract, convert units, find a
@@ -526,61 +523,61 @@ awk    & column arithmetic and reformatting: extract, convert units, find a
 grep   & find out whether a run failed, or pull one labelled line out of a log \\[1.mm]
 Python & everything structured: interpolation, curve fitting, several tables
          at once, fields rather than columns, and any figure for a report \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent The honest division of labour is that \texttt{sed} and the shell
 generate the runs, \texttt{awk} reduces the output to a small table, and
 Python takes over from there. Many working setups use all three, and there
 is nothing wrong with that.
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
-Export once, analyse outside. Curves leave \texttt{Cast3M} as a CSV file with
-a header -- the \op{EXPORTCSV} procedure of section~\ref{sec:py:export} is
-the modern replacement for \op{@excel1} -- and fields leave as VTK. On the
-Python side, pandas and matplotlib handle the curves and give you vector
-figures that drop straight into \LaTeX{}, while pyvista handles the fields
-and does things the built-in viewer cannot: sampling along an arbitrary path,
-integrating over the domain, comparing two different meshes on the same
-abscissa.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{Export once, analyse outside.} Curves leave
+  \texttt{Cast3M} as a CSV file with a header -- the \op{EXPORTCSV}
+  procedure of section~\ref{sec:py:export} is the modern replacement for
+  \op{"@excel1} -- and fields leave as VTK.
+  \item \textbf{pandas and matplotlib for the curves}, and they give you
+  vector figures that drop straight into \LaTeX{}.
+  \item \textbf{pyvista for the fields}, which does things the built-in
+  viewer cannot: sampling along an arbitrary path, integrating over the
+  domain, comparing two different meshes on the same abscissa.
+  \item \textbf{A parameter study is a template plus a loop.}
+  \texttt{sed} substitutes the parameters into a \texttt{.dgibi} file, the
+  shell runs each case \emph{in its own directory} -- \texttt{fort.3} and
+  \texttt{fort.98} make that compulsory -- and \texttt{awk} reduces the
+  results to one table. Python takes over wherever the analysis stops being
+  column arithmetic.
+  \item \textbf{The real gain is not the prettier picture}: it is that the
+  whole study becomes a script. Rerun the computation, rerun the script, and
+  every figure in your report updates.
+\end{itemize}
+\end{gbox*}
 
-On the input side, a parameter study is a template plus a loop: \texttt{sed}
-substitutes the parameters into a \texttt{.dgibi} file, the shell runs each
-case \emph{in its own directory} -- \texttt{fort.3} and \texttt{fort.98} make
-that compulsory -- and \texttt{awk} reduces the results to one table. Python
-takes over wherever the analysis stops being column arithmetic.
+\framepart{Exercises}
 
-The real gain, either way, is not the prettier picture: it is that the whole
-study becomes a script. Rerun the computation, rerun the script, and every
-figure in your report updates.
-
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
-
-\begin{enumerate}
-\item \textbf{Replace \texttt{@excel1}.} Take any computation from the
+\exercise{Replace \texttt{@excel1}} Take any computation from the
   previous chapters, export its results with \op{EXPORTCSV}, and reproduce in
   matplotlib a figure you had previously made with \op{dess}. Which of the
   two is faster to redo after the computation changes?
 
-\item \textbf{Convergence study.} Use the parametric pattern of
+\exercise{Convergence study} Use the parametric pattern of
   section~\ref{sec:py:param} to run the plate with \op{nel} $=5,10,20,40,80$
   and plot the maximum von Mises stress against the number of degrees of
   freedom, on logarithmic axes. Estimate the convergence rate from the slope.
 
-\item \textbf{The same sweep, twice.} Do the convergence study of the
+\exercise{The same sweep, twice} Do the convergence study of the
   previous exercise a second time, with a shell script instead of Python:
   a template plus \texttt{sed}, a loop over \op{nel}, and an \texttt{awk}
   one-liner to pull the maximum stress out of each \texttt{history.csv} into
   a single table. Which version was quicker to write, and which would you
   rather hand to someone else?
 
-\item \textbf{Compare two meshers.} Compute the same problem on the
+\exercise{Compare two meshers} Compute the same problem on the
   \texttt{Cast3M} mesh of chapter~\ref{chap:meshing} and on the
   \textsc{gmsh} mesh of section~\ref{sec:io:gmsh}, export both to VTK, and use
   \texttt{sample\_over\_line} to plot $\sigma_{yy}$ along the same physical
   path for both. This is a comparison the built-in \op{evol} cannot make,
   since the two meshes have different nodes.
-\end{enumerate}

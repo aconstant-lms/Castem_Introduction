@@ -1,0 +1,251 @@
+%======================================================================
+%  style.tex -- page layout and typography
+%
+%  Same visual language as the "Nonlinear Problems in Mechanics" lecture
+%  notes (the RG style): Latin Modern, sans-serif bold headings with a
+%  rule under a gray chapter label, light-gray boxes, chapter frame parts
+%  (Outline / Summary / Exercises / References) in small caps, exercises
+%  with solutions in small type.
+%
+%  The first part of this file is shared verbatim with those notes, so a
+%  change made there can be copied across.  The second part, below the
+%  "Cast3M-specific" rule, holds what only this book needs: the gibiane
+%  command boxes and the operator tables.
+%======================================================================
+\usepackage[margin=2.4cm,headheight=14pt]{geometry}
+% Latin Modern with T1 when installed (standard TeX Live); plain Computer
+% Modern otherwise, so that the file compiles on minimal installations.
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}\usepackage[T1]{fontenc}}{%
+  \usepackage[T1]{fontenc}}
+\usepackage[utf8]{inputenc}
+% "english" must be named as the main language: babel otherwise takes the
+% last one it processes (french) and you get French spacing and em-dash
+% lists in an English book.  Use \begin{otherlanguage}{french} ... for the
+% French passages quoted from the notices.
+\usepackage[main=english,french]{babel}
+\usepackage{amsmath,amssymb,amsthm,bm,mathtools}
+\usepackage{xcolor,graphicx,enumitem,booktabs,array,multirow,tabularx}
+\usepackage{verbatim,placeins}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning,shapes.geometric,
+  decorations.pathreplacing,decorations.markings,decorations.pathmorphing}
+\usepackage[most]{tcolorbox}
+\usepackage[font=small,labelfont={sf,bf}]{caption}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{makeidx}
+\makeindex
+% The index is laid out by preamble/index.ist (sans-serif bold letter
+% headings).  latexmk picks that up from .latexmkrc; by hand it is
+%     makeindex -s preamble/index.ist castem
+\usepackage[explicit]{titlesec}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{xurl}            % lets long query-string URLs break anywhere
+\hypersetup{colorlinks,linkcolor=blue!50!black,citecolor=blue!50!black,
+  urlcolor=blue!50!black,breaklinks=true,
+  pdftitle={Introduction to Cast3M programming},
+  pdfauthor={Andrei Constantinescu}}
+\setlength{\emergencystretch}{3em}   % keeps long paths/URLs inside the margin
+\Urlmuskip=0mu plus 1mu\relax
+
+%---- headings: sans-serif bold, as in the RG notes ---------------------
+\titleformat{\chapter}[display]
+  {\sffamily\bfseries}
+  {\large\color{gray!70!black}\MakeUppercase{\chaptertitlename}~\thechapter}
+  {4pt}
+  {\titlerule[0.6pt]\vspace{6pt}\Huge #1}
+  [\vspace{2pt}]
+\titleformat{name=\chapter,numberless}[display]
+  {\sffamily\bfseries}{}{0pt}{\titlerule[0.6pt]\vspace{6pt}\Huge #1}
+\titlespacing*{\chapter}{0pt}{-10pt}{28pt}
+\titleformat{\section}{\sffamily\bfseries\Large}{\thesection}{0.8em}{#1}
+\titleformat{name=\section,numberless}{\sffamily\bfseries\Large}{}{0pt}{#1}
+\titleformat{\subsection}{\sffamily\bfseries\large}{\thesubsection}{0.8em}{#1}
+\titleformat{name=\subsection,numberless}{\sffamily\bfseries\large}{}{0pt}{#1}
+\titleformat{\subsubsection}{\sffamily\bfseries}{\thesubsubsection}{0.8em}{#1}
+\titleformat{name=\subsubsection,numberless}{\sffamily\bfseries}{}{0pt}{#1}
+\titleformat{\paragraph}[runin]{\sffamily\bfseries}{}{0pt}{#1}
+\titlespacing*{\paragraph}{0pt}{1.6ex plus .5ex minus .2ex}{0.6em}
+
+%---- running heads -------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[LE]{\sffamily\small\leftmark}
+\fancyhead[RO]{\sffamily\small\rightmark}
+\fancyfoot[C]{\sffamily\small\thepage}
+\renewcommand{\chaptermark}[1]{\markboth{\thechapter.\ #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ \ #1}}
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\sffamily\small\thepage}}
+
+%---- boxes: light gray background, bold sans-serif title -----------------
+\newtcolorbox{gbox}[1]{enhanced,breakable,colback=gray!12,colframe=gray!12,
+  boxrule=0pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,
+  title={#1},fonttitle=\sffamily\bfseries,coltitle=black,colbacktitle=gray!12,
+  toptitle=3pt,bottomtitle=0pt,titlerule=0pt}
+% untitled variant, used for take-home messages and short summaries
+\newtcolorbox{gbox*}{enhanced,breakable,colback=gray!12,colframe=gray!12,
+  boxrule=0pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt}
+
+%---- theorem-like statements in the same sans-serif voice ---------------
+\newtheoremstyle{sfthm}{\topsep}{\topsep}{\itshape}{}{\sffamily\bfseries}{.}{0.5em}{}
+\theoremstyle{sfthm}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheoremstyle{sfdef}{\topsep}{\topsep}{\normalfont}{}{\sffamily\bfseries}{.}{0.5em}{}
+\theoremstyle{sfdef}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\renewcommand{\proofname}{\sffamily\bfseries Proof}
+
+%---- exercises: sans-serif heading, solution in small type ---------------
+\newcounter{exo}[chapter]
+\renewcommand{\theexo}{\thechapter.\arabic{exo}}
+\newcommand{\exercise}[1]{\par\medskip\noindent\refstepcounter{exo}%
+  {\sffamily\bfseries Exercise~\theexo\quad#1.}\ }
+\newcommand{\solsize}{\scriptsize}   % change to \tiny for smaller solutions
+\newenvironment{solution}{\par\smallskip\begingroup\solsize\noindent
+  {\sffamily\bfseries Solution.}\ }{\par\endgroup\medskip}
+
+%---- code listings (Python), quiet gray frame in the box colour ----------
+\lstdefinestyle{pystyle}{language=Python,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{blue!60!black},commentstyle=\color{gray},
+  stringstyle=\color{green!45!black},
+  backgroundcolor=\color{gray!6},frame=none,
+  breaklines=true,showstringspaces=false,tabsize=4,
+  xleftmargin=0.6em,aboveskip=4pt,belowskip=4pt}
+\lstset{style=pystyle}
+
+%---- TikZ styles shared by the diagrams ---------------------------------
+\definecolor{cu}{RGB}{31,90,200}     % potential / displacement data S_u
+\definecolor{cphi}{RGB}{20,150,60}   % flux / traction data S_phi, S_t
+\tikzset{
+  box/.style={rectangle,rounded corners=2pt,fill=gray!12,draw=none,
+    minimum width=8.2cm,minimum height=1.0cm,align=center,inner sep=5pt,
+    font=\small},
+  smallbox/.style={rectangle,rounded corners=2pt,fill=gray!12,draw=none,
+    minimum width=4.6cm,minimum height=1.25cm,align=center,inner sep=5pt,
+    font=\small},
+  goal/.style={fill=green!12},
+  kin/.style={fill=cu!12,draw=cu!45,thin},
+  stat/.style={fill=cphi!12,draw=cphi!45,thin},
+  kinlab/.style={font=\small\sffamily,text=cu},
+  statlab/.style={font=\small\sffamily,text=cphi},
+  key/.style={fill=orange!14},
+  arr/.style={-{Latex[length=2.3mm]},thick}
+}
+
+%---- framing parts of every chapter --------------------------------------
+% Outline, Summary, Exercises, References: unnumbered, roman small caps,
+% listed in the table of contents. \framesub is the level below (e.g. the
+% parts of the exercises). A \label placed after \framepart works with
+% \nameref and \pageref (not with \ref, since the part has no number).
+\makeatletter
+\newcommand{\framepart}[1]{%
+  \par\addvspace{4.5ex plus 1ex minus .5ex}%
+  \phantomsection
+  \addcontentsline{toc}{section}{\protect\textsc{#1}}%
+  \markright{#1}%
+  \def\@currentlabelname{#1}%
+  {\noindent\normalfont\Large\scshape #1\par}%
+  \nobreak\vspace{0.6ex}\nobreak
+  {\color{gray!55}\hrule height 0.4pt}%
+  \nobreak\vspace{1.6ex plus .3ex}%
+  \@afterheading}
+\newcommand{\framesub}[1]{%
+  \par\addvspace{3ex plus .8ex minus .3ex}%
+  {\noindent\normalfont\large\scshape #1\par}%
+  \nobreak\vspace{1ex plus .2ex}%
+  \@afterheading}
+\makeatother
+
+%---- drafting aids (set \drafttrue/\draftfalse in castem.tex) ------------
+\newif\ifdraft
+\newcommand{\draftnote}[1]{\ifdraft{\sffamily\footnotesize\color{red!70!black}[#1]}\fi}
+
+\numberwithin{equation}{chapter}
+\numberwithin{figure}{chapter}
+\numberwithin{table}{chapter}
+\setlist{itemsep=1pt}
+
+%======================================================================
+%  Cast3M-specific: the gibiane command boxes
+%
+%  Every worked example in this book is a pair
+%
+%      \begin{castemcom}   ... explanation ...        \end{castemcom}
+%      \begin{castemlines} \begin{verbatim} ... \end{verbatim} \end{castemlines}
+%
+%  which typesets as: explanation on the left, gibiane commands in a
+%  light gray box on the right.  Keep the two environments adjacent, with
+%  NO blank line between them, otherwise they end up one below the other.
+%
+%  The commands are captured in a save box first.  That detour is what
+%  makes it legal to put a verbatim environment inside a coloured box:
+%  the body of an lrbox is typeset, not read as a macro argument.
+%
+%  65 + 4 + 92 = 161 mm fits the 162 mm text block of the geometry above,
+%  and the command box holds a 60-column gibiane line (the language itself
+%  allows up to 72 characters per line).
+%======================================================================
+
+\colorlet{CodeGray}{gray!12}         % same gray as gbox, so that a command
+                                     % box and a summary box match
+\definecolor{Gray}{gray}{.80}        % kept for compatibility; unused
+
+\newlength{\castemcomwidth}   \setlength{\castemcomwidth}{65.mm}
+\newlength{\castemlineswidth} \setlength{\castemlineswidth}{92.mm}
+\newlength{\codeboxsep}       \setlength{\codeboxsep}{5.pt}
+
+\newsavebox{\castemsavebox}
+
+\newenvironment{castemlines}
+{\begin{lrbox}{\castemsavebox}%
+ \begin{minipage}[t]{\dimexpr\castemlineswidth-2\codeboxsep\relax}%
+ \begin{small}}
+{\end{small}%
+ \end{minipage}%
+ \end{lrbox}%
+ {\setlength{\fboxsep}{\codeboxsep}\colorbox{CodeGray}{\usebox{\castemsavebox}}}%
+ \par\medskip\noindent}
+
+\newenvironment{castemcom}
+{\par\vspace*{3.mm}%
+ \noindent
+ \begin{minipage}[t]{\castemcomwidth}%
+ \begin{small}}
+{\end{small}%
+ \end{minipage}%
+ \hspace*{4.mm}}
+
+% Full-width gray code box, for shell commands and for the Python and gmsh
+% listings that have no facing comment.  Same save-box trick as castemlines.
+\newsavebox{\codeboxsave}
+\newenvironment{codebox}
+{\par\medskip\begin{lrbox}{\codeboxsave}%
+ \begin{minipage}{\dimexpr\linewidth-2\codeboxsep\relax}%
+ \begin{small}}
+{\end{small}%
+ \end{minipage}%
+ \end{lrbox}%
+ \noindent{\setlength{\fboxsep}{\codeboxsep}\colorbox{CodeGray}{\usebox{\codeboxsave}}}%
+ \par\medskip}
+
+% Boxed summary table of operators:  \begin{optable}{Title} a & b \\ \end{optable}
+% A gbox with the standard two columns, operator on the left in typewriter.
+% The description column is 86 mm, which leaves room for the longest
+% operator name in the book (31 characters) inside the box.  Note: do NOT
+% use tabularx here -- inside a breakable tcolorbox it measures against
+% \textwidth rather than the box content width and overflows the box.
+\newenvironment{optable}[1]
+{\begin{gbox}{#1}%
+ \begin{tabular}{@{}>{\ttfamily}l@{\hspace{5mm}}p{86mm}@{}}}
+{\end{tabular}%
+ \end{gbox}}

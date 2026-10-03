@@ -1,8 +1,7 @@
-\chapter{\textbf{Elliptic problems: elasticity and heat transfer}}
+\chapter{Elliptic problems: elasticity and heat transfer}
 \label{chap:elasticity}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 This chapter sets up and solves the two model elliptic problems: linear
 elastic equilibrium and thermal equilibrium. The two are treated together
@@ -1110,8 +1109,7 @@ temperature field, or tabulate it as an \op{evolution} and interpolate with
 and is what the data-reading section of chapter~\ref{chap:importexport} is
 for.
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
 The whole chapter is one sequence of five operators, and it is the same
 sequence for elasticity and for heat conduction:
@@ -1127,21 +1125,24 @@ solution             & \op{reso}                  & \op{reso} \\
 \end{tabular}
 \end{center}
 
-\noindent Imposed conditions are handled by Lagrange multipliers, so they
-\emph{add} unknowns rather than removing them, and those multipliers are the
-reactions, recovered with \op{reac}. Loads that are not simply nodal forces
--- pressure, weight, thermal expansion -- are all built the same way: form a
-field, integrate it against the shape functions with the operator that
-belongs to it (\op{pres}, \op{mass}, \op{thet}), and add the result to the
-right-hand side. Spatially varying data, whether a load or a material
-parameter, is built with \op{coor} and \op{masq} and then moved to the Gauss
-points with \op{chan}.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{Imposed conditions add unknowns rather than removing them.}
+  They are handled by Lagrange multipliers, and those multipliers are the
+  reactions, recovered with \op{reac}.
+  \item \textbf{Every load that is not a nodal force is built the same way.}
+  Pressure, weight, thermal expansion: form a field, integrate it against
+  the shape functions with the operator that belongs to it (\op{pres},
+  \op{mass}, \op{thet}), and add the result to the right-hand side.
+  \item \textbf{Spatially varying data is built from the coordinates.}
+  Whether it is a load or a material parameter: \op{coor} and \op{masq} to
+  build it, \op{chan} to move it to the Gauss points.
+\end{itemize}
+\end{gbox*}
 
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+\framepart{Exercises}
 
-\begin{enumerate}
-\item \textbf{Stresses and strains in a plate with a hole.} Run the program
+\exercise{Stresses and strains in a plate with a hole} Run the program
   presented in this chapter and:
   \begin{itemize}
   \item check the stress distribution for all types of applied force: body
@@ -1155,19 +1156,19 @@ points with \op{chan}.
   \end{itemize}
   See the file \texttt{traction\_trou.dgibi}.
 
-\item \textbf{Mesh convergence.} Repeat the computation with \op{nel} equal to
+\exercise{Mesh convergence} Repeat the computation with \op{nel} equal to
   5, 10, 20 and 40 and plot the maximum von Mises stress against the number of
   degrees of freedom. At which refinement is the result converged to within
   1\%? Compare the convergence of the displacement with that of the stress and
   explain why they differ.
 
-\item \textbf{Elastic and thermal example files.} Run the elasticity example
+\exercise{Elastic and thermal example files} Run the elasticity example
   files \texttt{elas*.dgibi} and the thermal ones \texttt{ther*.dgibi} from
   the \texttt{cast3m\_dir/dgibi} directory of your installation, and read the
   notes in \texttt{cast3m\_dir/dgibi/annotated\_testing\_files\_98.pdf} and
   on the \textbf{Exemples} page of the website.
 
-\item \textbf{Torsion by the thermal analogy.} Following
+\exercise{Torsion by the thermal analogy} Following
   section~\ref{sec:elas:torsion}, compute the warping function and the
   torsional rigidity $J$ of a \emph{circular} section, for which the exact
   answer is $J=\pi R^{4}/2$ and the warping is identically zero -- a good
@@ -1180,10 +1181,9 @@ points with \op{chan}.
   as a procedure of your own taking a meshed section and returning a table.
   It is a satisfying small project and the result is genuinely useful.
 
-\item \textbf{Thermoelastic coupling.} Compute the temperature field of the
+\exercise{Thermoelastic coupling} Compute the temperature field of the
   plate with the hole with the boundary conditions of
   section~\ref{sec:elas:thermal}, then use it as a loading for the elastic
   problem through a thermal dilation coefficient \texttt{'ALPH'}. Where are
   the largest stresses, and why are they not where the temperature is
   highest?
-\end{enumerate}

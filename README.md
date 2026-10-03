@@ -29,21 +29,29 @@ build it yourself.
 
     make
 
-which runs `latexmk -pdf castem`. By hand:
+which runs `latexmk -pdf castem`. `.latexmkrc` is what tells makeindex to use
+the index style file, so prefer latexmk. By hand:
 
-    pdflatex castem ; bibtex castem ; makeindex castem ; pdflatex castem ; pdflatex castem
+    pdflatex castem
+    bibtex castem
+    makeindex -s preamble/index.ist castem
+    pdflatex castem ; pdflatex castem
 
-Needs a TeX Live with `babel-french` (`texlive-lang-french` on Debian/Ubuntu)
-and `helvet`. `make check` reports undefined references, overfull boxes and
-makeindex errors — all three should be zero, and CI fails the build if they
-are not.
+Needs a TeX Live with `babel-french` (`texlive-lang-french` on Debian/Ubuntu),
+`lmodern`, `tcolorbox`, `titlesec` and `fancyhdr` — all in
+`texlive-latex-extra` plus the `lmodern` package. `make check` reports
+undefined references, overfull boxes and makeindex errors — all three should
+be zero, and CI fails the build if they are not.
 
 ## Files
 
 | file | contents |
 |---|---|
-| `castem.tex` | master file: preamble, macros, `\include` list |
-| `ch_title.tex` | title page |
+| `castem.tex` | master file: `\input` of the preamble, `\include` list |
+| `preamble/style.tex` | page layout and typography |
+| `preamble/notation.tex` | mathematical notation, `\op`, the index macros |
+| `preamble/index.ist` | makeindex style: sans-serif bold letter headings |
+| `front/titlepage.tex` | title page |
 | `ch_introduction.tex` | ch. 1 — what Cast3M is, install, running, gibiane basics |
 | `ch_meshing.tex` | ch. 2 — mesh creation |
 | `ch_elasticity.tex` | ch. 3 — elasticity and thermal equilibrium |
@@ -58,19 +66,37 @@ are not.
 | `FIG/` | figures |
 | `OLD/` | superseded monolithic chapter, not included in the build |
 
-## Headings
+## Style
 
-The sectioning commands are redefined with `\@startsection` in `castem.tex`
-(chapter / section / subsection / subsubsection). All four use
-`\normalfont\<size>\bfseries\sffamily`, and `\sffamily` is mapped to
-**Helvetica** by `\usepackage[scaled=0.92]{helvet}`. `\sffamily` appears
-nowhere else in the document, so that one package line controls the whole
-heading font; drop it and the headings revert to Computer Modern Sans.
+The layout is shared with the companion lecture notes
+[*Nonlinear Problems in Mechanics*](https://github.com/aconstant-lms/npm-lecture),
+so that the two read as one series: Latin Modern, sans-serif bold headings
+under a gray chapter label and a rule, running heads in the same sans,
+light-gray boxes, and chapter frame parts in small caps.
 
-To change the space before a heading, edit the **beforeskip** (the fourth
-argument of `\@startsection`). Do not put a `\vspace` in front of the
-`\@startsection` call: that glue sits outside the heading's page-break
-logic and can be stranded at the foot of a page.
+`preamble/style.tex` and `preamble/notation.tex` are shared with that
+repository above the rule that says *Cast3M-specific* / *Additions for the
+Cast3M notes*; everything below the rule is only in this book. A change made
+in one repository above the rule can be copied straight across. `\vect`,
+`\tens`, `\sig`, `\eps`, `\bbC` and the rest therefore mean the same thing
+in both books.
+
+Headings are set with `titlesec`, not with `\@startsection`. To change the
+space before a chapter heading, edit `\titlespacing*{\chapter}` in
+`preamble/style.tex`; never put a bare `\vspace` in front of a heading, since
+that glue sits outside the page-break logic and can be stranded at the foot
+of a page.
+
+Each chapter is framed the same way: `\framepart{Outline}`, numbered
+sections, `\framepart{Summary}` holding a `gbox*` of bold-led items, and
+`\framepart{Exercises}` holding `\exercise{Title}` items. Frame parts are
+unnumbered and appear in the table of contents in small caps; refer to them
+with `\pageref` or `\nameref`, never `\ref`.
+
+The one deliberate difference from the companion notes is the bibliography:
+this book keeps a single BibTeX file, `castem.bib`, where the other uses a
+per-chapter `chapterbib`. That is worth revisiting once the references here
+have been gone through.
 
 ## Conventions
 
@@ -93,9 +119,14 @@ Keep gibiane lines under about 50 characters so they fit the box.
 
 Full-width listings (shell, Python, gmsh) use `\begin{codebox} ... \end{codebox}`.
 
-Operator tables use `\begin{optable}{Title} op & description \\ \end{optable}`.
+Operator tables use `\begin{optable}{Title} op & description \\ \end{optable}`,
+which is a `gbox` with a typewriter first column and an 86 mm description
+column. Other tables that want the same gray box use `gbox` directly, and
+`gbox*` is the untitled variant. Do **not** use `tabularx` inside either: in a
+breakable `tcolorbox` it measures against `\textwidth` rather than the box
+content width and pushes the table out of the box.
 
-**Index.** Three macros, all defined in `castem.tex`:
+**Index.** Three macros, all defined in `preamble/notation.tex`:
 
 | macro | for | renders as |
 |---|---|---|
@@ -112,6 +143,10 @@ only when they mark genuinely different uses (`trac[er]` appears under *plot*,
 *save graphics* and *grey levels*). And makeindex's three special characters
 `@ ! |` must be escaped with a double quote in the visible text:
 `\sindex{"@excel1}`.
+
+**Long names.** A Cast3M name too wide for the comment column of a worked
+example — `Mooney_LRGTreloar_Cisaillementsimple` and its kind — is written
+with `\ul` in place of `\_`, which permits a line break after the underscore.
 
 **Open items.** `grep -n todoeq ch_*.tex` lists the places where an equation
 from the lecture notes still has to be filled in.

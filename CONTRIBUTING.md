@@ -33,6 +33,14 @@ They are described more fully in the "Conventions" section of the
 
 - **UTF-8.** All `.tex` files are UTF-8. `file *.tex` should say so for every
   one of them.
+- **The style files are shared.** `preamble/style.tex` and
+  `preamble/notation.tex` are common with the companion notes *Nonlinear
+  Problems in Mechanics* above the rule marked *Cast3M-specific*. Please keep
+  changes to that shared part to a minimum, and put anything that belongs only
+  to this book below the rule.
+- **Chapter frame.** `\framepart{Outline}`, numbered sections,
+  `\framepart{Summary}` with a `gbox*` of bold-led items, then
+  `\framepart{Exercises}` with `\exercise{Title}` items.
 - **Worked examples** are a `castemcom` (the explanation) immediately followed
   by a `castemlines` (the gibiane), with no blank line between them. Keep
   gibiane lines under about 50 characters so they fit the box.
@@ -49,6 +57,8 @@ Marked in the source and worth picking up:
 
 - `grep -n todoeq ch_*.tex` — places where an equation from the lecture notes
   still has to be filled in.
-- The bibliography is incomplete and some entries need checking.
+- The bibliography is incomplete and some entries need checking. It is also
+  the one place where this book still differs from the companion notes, which
+  carry a per-chapter `chapterbib` instead of one BibTeX file.
 - `OLD/` holds a superseded French chapter, kept only until someone confirms
   nothing is missing from it.

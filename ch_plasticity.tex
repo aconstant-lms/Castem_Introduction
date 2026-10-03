@@ -1,9 +1,8 @@
-\chapter{\textbf{Elastoplasticity}}
+\chapter{Elastoplasticity}
 \label{chap:plasticity}
 
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 This chapter treats the first genuinely nonlinear problem of the booklet.
 It does so twice: first by programming an incremental algorithm by hand, so
@@ -444,10 +443,8 @@ and understanding it.
 
 \cindex{convergence monitoring}\sindex{Nplas}\sindex{Critere}%
 \sindex{Deps.max}\sindex{Eps.max}\sindex{Crit.flex}%
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{5mm}}p{86mm}@{\hspace{2mm}}}
-\multicolumn{2}{c}{\textbf{The \texttt{pasapas} convergence columns}} \\[2.mm]
+\begin{gbox}{The \texttt{pasapas} convergence columns}
+\begin{tabular}{@{}>{\ttfamily}l@{\hspace{5mm}}p{115mm}@{}}
 Iter      & the iteration number within the current step \\[1.mm]
 Nplas     & the \emph{number of integration points} whose internal variable
             changed by more than $10^{-10}$ during this iteration, i.e. how
@@ -462,8 +459,8 @@ Crit.flex & the same criterion as \texttt{Critere} but formed on the
             \emph{moment} components -- \emph{flexion}, bending. Non-zero
             only for elements with rotational degrees of freedom: beams,
             plates, shells \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent The two criteria are relative, which is what makes
 \texttt{'PRECISION'} independent of your unit system. Writing $R$ for the
@@ -744,47 +741,50 @@ which can be plotted using the \texttt{dess[iner]} command.
 \end{verbatim}
 \end{castemlines}
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
-A nonlinear computation is two nested loops: an outer loop over load
-increments, and an inner loop that iterates until the residual -- applied
-forces minus $[B^{T}]\sigma$ -- is small compared with the applied forces.
-Writing it out in \textsc{gibiane}, as in section~\ref{sec:plas:incremental},
-takes about forty lines and is worth doing once.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{A nonlinear computation is two nested loops}: an outer loop
+  over load increments, and an inner loop that iterates until the residual
+  -- applied forces minus $[B^{T}]\sigma$ -- is small compared with the
+  applied forces. Writing it out in \textsc{gibiane}, as in
+  section~\ref{sec:plas:incremental}, takes about forty lines and is worth
+  doing once.
+  \item \textbf{After that, use \op{pasapas}.} It performs the same two
+  loops, with a far better convergence strategy and automatic step
+  subdivision.
+  \item \textbf{One \op{table} in, the same table out.} You fill
+  \texttt{'MODELE'}, \texttt{'CARACTERISTIQUES'},
+  \texttt{'BLOCAGES\_MECANIQUES'}, \texttt{'CHARGEMENT'} and
+  \texttt{'TEMPS\_CALCULES'}; it fills \texttt{'DEPLACEMENTS'},
+  \texttt{'CONTRAINTES'} and \texttt{'VARIABLES\_INTERNES'} back into the
+  same table, each a sub-table indexed by step.
+  \item \textbf{That input/output table is the single idea to take away.} It
+  reappears unchanged for large strain in
+  chapter~\ref{chap:largestrain}.
+\end{itemize}
+\end{gbox*}
 
-After that, use \op{pasapas}. It performs the same two loops, with a far
-better convergence strategy and automatic step subdivision, and it is driven
-entirely by one \op{table}: you fill \texttt{'MODELE'},
-\texttt{'CARACTERISTIQUES'}, \texttt{'BLOCAGES\_MECANIQUES'},
-\texttt{'CHARGEMENT'} and \texttt{'TEMPS\_CALCULES'}, and it fills
-\texttt{'DEPLACEMENTS'}, \texttt{'CONTRAINTES'} and
-\texttt{'VARIABLES\_INTERNES'} back into the same table, each a sub-table
-indexed by step. That input/output table is the single idea to take away: it
-reappears unchanged for large strain in chapter~\ref{chap:largestrain}.
+\framepart{Exercises}
 
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
-
-\begin{enumerate}
-\item \textbf{Hand-written against \op{pasapas}.} Run the incremental
+\exercise{Hand-written against \op{pasapas}} Run the incremental
   algorithm of section~\ref{sec:plas:incremental} and the \op{pasapas} computation of
   section~\ref{sec:plas:pasapas} on the same square domain, with the same
   material and the same loading, and compare the stress--strain curves at a
   Gauss point. They should coincide to within the equilibrium tolerance.
 
-\item \textbf{Cost of the tolerance.} Rerun the hand-written algorithm with
+\exercise{Cost of the tolerance} Rerun the hand-written algorithm with
   \op{tol\_res} equal to $10^{-2}$, $10^{-3}$ and $10^{-5}$, counting the
   total number of equilibrium iterations. Plot the error on the final stress
   against the number of iterations.
 
-\item \textbf{Kinematic versus isotropic hardening.} The example uses
+\exercise{Kinematic versus isotropic hardening} The example uses
   kinematic hardening. Change the model to isotropic hardening and apply a
   full load--unload--reload cycle. Which of the two reproduces the
   Bauschinger effect, and how do you see it on the stress--strain curve?
 
-\item \textbf{Constant versus tangent stiffness.} The algorithm here
+\exercise{Constant versus tangent stiffness} The algorithm here
   re-uses the elastic stiffness at every iteration. Estimate how many
   iterations per step it needs, and discuss what a tangent-stiffness update
   would change in cost per iteration and in number of iterations.
-\end{enumerate}

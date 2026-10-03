@@ -1,8 +1,7 @@
-\chapter{\textbf{Introduction}}
+\chapter{Introduction}
 \label{chap:introduction}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 This chapter tells you what \texttt{Cast3M} is, how to install it, and how to
 run your first file. If you only want to get a \texttt{.dgibi} file supplied
@@ -39,10 +38,8 @@ your way around it before you start, because the site -- not this booklet --
 is the authoritative and up-to-date reference. The pages you will use most
 are:
 
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}l@{\hspace{4mm}}p{72mm}@{\hspace{2mm}}}
-\multicolumn{2}{c}{\textbf{Where to look on the Cast3M site}} \\[2.mm]
+\begin{gbox}{Where to look on the Cast3M site}
+\begin{tabular}{@{}l@{\hspace{4mm}}p{112mm}@{}}
 \textbf{Notices} & the reference manual: one page per operator, about 1\,100 of
 them, with a full-text search over the notices \\[1.mm]
 \texttt{?page=notices} & \\[2.mm]
@@ -59,8 +56,8 @@ fastest way to learn an operator \\[1.mm]
 \textbf{Utilitaires} & editor syntax files and the mesh conversion scripts \\[1.mm]
 \texttt{?xml=utilitaires} & \\[2.mm]
 \textbf{FAQ} & \texttt{?page=faqphp} \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent prefix each of these with
 \texttt{https://www-cast3m.cea.fr/index.php}, for instance
@@ -142,17 +139,15 @@ The distribution is a self-contained archive with an installer script inside;
 there is nothing to compile. Unpack it, read the \texttt{Readme.txt} /
 \texttt{Lisez-moi.txt} it contains, and run the installer:
 
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}l@{\hspace{4mm}}l@{\hspace{4mm}}p{58mm}@{\hspace{2mm}}}
-\multicolumn{3}{c}{\textbf{Installation}} \\[2.mm]
+\begin{gbox}{Installation}
+\begin{tabular}{@{}l@{\hspace{4mm}}l@{\hspace{4mm}}p{88mm}@{}}
 \textbf{Platform} & \textbf{Installer} & \textbf{Notes} \\[1.mm]
 GNU/Linux & \texttt{INSTALL\_CAST3M.sh} & \texttt{tar} archive; run the script \\[1.mm]
 Windows   & \texttt{INSTALL\_CAST3M.bat} & \texttt{zip} archive; double-click \\[1.mm]
 macOS     & \texttt{INSTALL\_CAST3M.sh} & \texttt{tar} archive; needs Xcode, then
                                           \texttt{sudo xcodebuild -license} \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent A graphical installer then takes over and sets the environment up
 for you. Three remarks:
@@ -176,16 +171,14 @@ You should not normally have to set these yourself, but they are what the
 installer configures and what you will need if you move an installation or run
 on a cluster:
 
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{95mm}@{\hspace{2mm}}}
-\multicolumn{2}{c}{\textbf{Environment variables}} \\[2.mm]
+\begin{gbox}{Environment variables}
+\begin{tabular}{@{}>{\ttfamily}l@{\hspace{4mm}}p{112mm}@{}}
 CASTEM\_PROCEDUR26 & directory the standard procedures are read from \\
 CASTEM\_NOTICE26   & directory the operator notices are read from \\
 ESOPE\_PARAM       & size of the \textsc{esope} central memory zone, in machine
                      words \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent Procedures are looked up in the current directory first, then in
 \texttt{./procedur}, then in the installation directory -- which is why you can
@@ -503,14 +496,22 @@ hand the programming of classical finite element algorithms. From the
 practical point of view, however, do not forget that most classical problem
 settings in mechanics already have dedicated operators.
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
 You should now be able to install \texttt{Cast3M}, launch it on a file and
 get the hand back at the interactive prompt, and read the notice of any
-operator. The three things worth carrying into the next chapters are: the
-executable is \texttt{castem26}, not \texttt{castem}; a statement ends at the
-\texttt{;} and brackets are compulsory because there is no operator
-precedence; and the distinction between a field at the nodes
-(\op{chpoint}) and a field on the elements (\op{mchaml}) governs almost
-every plotting and combination error you will make.
+operator. Three things are worth carrying into the next chapters.
+
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{The executable carries the version number}: it is
+  \texttt{castem26}, not \texttt{castem}.
+  \item \textbf{A statement ends at the \texttt{;}, and brackets are
+  compulsory}, because there is no operator precedence in
+  \textsc{gibiane}.
+  \item \textbf{A field at the nodes (\op{chpoint}) is not a field on the
+  elements (\op{mchaml}).} That distinction governs almost every plotting
+  and combination error you will make.
+\end{itemize}
+\end{gbox*}
+

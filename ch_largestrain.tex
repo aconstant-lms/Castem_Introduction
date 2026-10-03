@@ -1,8 +1,7 @@
-\chapter{\textbf{Large strain and hyperelasticity}}
+\chapter{Large strain and hyperelasticity}
 \label{chap:largestrain}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 Everything so far assumed small strains: the equilibrium equations were
 written on the undeformed geometry, and strain was the symmetric part of the
@@ -280,12 +279,13 @@ the 8-chain model takes \texttt{'NKT'} and \texttt{'VN~~'}.
 The table is the one from chapter~\ref{chap:plasticity}, with a handful of
 extra entries.
 
-\textbf{A version caveat before the table.} \texttt{'HYPOTHESE\_DEFORMATIONS'}
-and the \texttt{'MI\_PAS'}/\texttt{'FIN\_PAS'} values of
-\texttt{'LAGRANGIEN'} are recent additions: they are in the notice of current
-versions but not in distributions of a few years ago, where the strain measure
-could only be set through \op{opti 'EPSI'} or \op{mode \ldots 'EPSI'} and
-\texttt{'LAGRANGIEN'} took only \texttt{'TOTAL'} or \texttt{'REACTUALISE'}.
+\textbf{A version caveat before the table.} Two of the entries are recent
+additions: \texttt{'HYPOTHESE\_DEFORMATIONS'}, and the
+\texttt{'MI\_PAS'}/\texttt{'FIN\_PAS'} values of \texttt{'LAGRANGIEN'}. They
+are in the notice of current versions but not in distributions of a few years
+ago, where the strain measure could only be set through \op{opti 'EPSI'} or
+\op{mode \ldots 'EPSI'} and \texttt{'LAGRANGIEN'} took only
+\texttt{'TOTAL'} or \texttt{'REACTUALISE'}.
 Setting the strain measure on the model, as in section~\ref{sec:ls:changes},
 works on every version and is the portable choice.
 
@@ -308,7 +308,7 @@ works on every version and is the portable choice.
 
 \begin{castemcom}
 A complete driver, following the shipped example
-\texttt{Mooney\_LRGTreloar\_Cisaillementsimple}: a simple shear of a
+\texttt{Mooney\ul LRGTreloar\ul Cisaillementsimple}: a simple shear of a
 Mooney--Rivlin block in plane stress, which has an analytical solution to
 check against.
 
@@ -352,16 +352,16 @@ slightly wrong answer, it gives a meaningless one.
 
 \subsection*{Example files to start from}
 
-The distribution ships about twenty-five hyperelastic test cases, named
-\texttt{<model><loading><hypothesis>} -- \texttt{trac} for traction,
-\texttt{cis} for shear, \texttt{dp} for plane strain, \texttt{3d} for three
-dimensions:
+The distribution ships about twenty-five hyperelastic test cases. The names
+are built as \texttt{<model><loading><hypothesis>}, with \texttt{trac} for
+traction, \texttt{cis} for shear, \texttt{dp} for plane strain and
+\texttt{3d} for three dimensions:
 
 \begin{center}
-\begin{tabular}{@{}>{\ttfamily}l@{\hspace{6mm}}p{85mm}@{}}
-Mooney\_LRGTreloar\_Traction & Mooney--Rivlin, uniaxial tension, checked
+\begin{tabular}{@{}>{\ttfamily\raggedright\arraybackslash}p{50mm}@{\hspace{6mm}}p{100mm}@{}}
+Mooney\ul LRGTreloar\ul Traction & Mooney--Rivlin, uniaxial tension, checked
   against the analytical solution \\
-Mooney\_LRGTreloar\_Cisaillementsimple & the same law in simple shear;
+Mooney\ul LRGTreloar\ul Cisaillementsimple & the same law in simple shear;
   \textbf{the best single teaching example}, since it uses
   \texttt{'GRANDS\_DEPLACEMENTS'}, \texttt{'HYPOTHESE\_DEFORMATIONS'} and
   \texttt{'REAC\_GRANDS'} together \\
@@ -522,32 +522,36 @@ cylimp = cyl plus imper;
 \end{verbatim}
 \end{castemlines}
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
-Large strain adds three independent choices to the computations of the
-previous chapters, and \texttt{Cast3M} keeps them separate. The geometry is
-updated by \texttt{'GRANDS\_DEPLACEMENTS'}; the strain measure is chosen by
-\texttt{'EPSI'} on \op{opti} or \op{mode}, \emph{not} by the obsolete
-\texttt{'GRANDES\_DEFORMATIONS'} index, which now aborts the run; and the
-constitutive law is selected through \texttt{'NON\_LINEAIRE' 'UTILISATEUR'}
-with a \texttt{'NUME\_LOI'} number, with six hyperelastic models available.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{Large strain adds three independent choices}, and
+  \texttt{Cast3M} keeps them separate: the geometry update, the strain
+  measure, and the constitutive law.
+  \item \textbf{The geometry is updated by \texttt{'GRANDS\_DEPLACEMENTS'}}
+  in the \op{pasapas} table.
+  \item \textbf{The strain measure is chosen by \texttt{'EPSI'}} on
+  \op{opti} or \op{mode} -- \emph{not} by the obsolete
+  \texttt{'GRANDES\_DEFORMATIONS'} index, which now aborts the run.
+  \item \textbf{The law is selected through \texttt{'NON\_LINEAIRE'
+  'UTILISATEUR'}} with a \texttt{'NUME\_LOI'} number, with six hyperelastic
+  models available.
+  \item \textbf{Contact is an additional \emph{model}}, built from
+  \op{impo 'MAIL'} on two oriented surfaces; self-contact is the same
+  construction with one surface given twice and the second criterion
+  \op{crit2} excluding self-pairs.
+  \item \textbf{For choosing a rubber model}, Marckmann and
+  Verron~\cite{Marckmann:2006} compare twenty of them against the classical
+  data; the laws in \texttt{Cast3M} itself are due to Gornet, whose Club
+  Cast3M 2011 presentation~\cite{Gornet:club2011} is the implementation
+  reference.
+\end{itemize}
+\end{gbox*}
 
-The driver remains the \op{pasapas} table. Contact enters it as an additional
-\emph{model}, built from \op{impo 'MAIL'} on two oriented surfaces, and
-self-contact is the same construction with one surface given twice and the
-second criterion \op{crit2} excluding self-pairs.
+\framepart{Exercises}
 
-For choosing a rubber model, Marckmann and Verron~\cite{Marckmann:2006}
-compare twenty of them against the classical data; the laws in
-\texttt{Cast3M} itself are due to Gornet, whose Club Cast3M 2011
-presentation~\cite{Gornet:club2011} is the implementation reference.
-
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
-
-\begin{enumerate}
-\item \textbf{Uniaxial tension of a rubber.} Run
+\exercise{Uniaxial tension of a rubber} Run
   \texttt{Mooney\_LRGTreloar\_Traction} and reproduce the nominal
   stress--stretch curve up to $\lambda=7$. Compare with the analytical
   Mooney--Rivlin result
@@ -555,25 +559,25 @@ presentation~\cite{Gornet:club2011} is the implementation reference.
   model start to deviate from Treloar's data, and which of the models of
   section~\ref{sec:ls:hyper} would do better there?
 
-\item \textbf{Comparing models.} Fit Mooney--Rivlin, Hart--Smith and
+\exercise{Comparing models} Fit Mooney--Rivlin, Hart--Smith and
   Gornet--Desmorat to the same uniaxial data and then use each to predict
   \emph{simple shear}. This is the test that separates them -- a model fitted
   on one loading mode need not predict another. Compare with the conclusions
   of~\cite{Marckmann:2006}.
 
-\item \textbf{The incompressibility limit.} Rerun the Mooney--Rivlin tension
+\exercise{The incompressibility limit} Rerun the Mooney--Rivlin tension
   with $\nu = 0.49$, $0.499$, $0.4999$ and $0.49999$. At what point does the
   computation stop converging, and what does that tell you about why a
   quasi-incompressible formulation with a penalty coefficient \texttt{'D'}
   exists?
 
-\item \textbf{Hertz contact.} Build the contact of a cylinder on a plane in
+\exercise{Hertz contact} Build the contact of a cylinder on a plane in
   2D, starting from \texttt{Contact2D}, and compare the contact pressure
   distribution and the half-width of the contact patch with the analytical
   Hertz solution. Then halve the mesh size in the contact zone and see how
   much the peak pressure changes -- contact pressures converge slowly.
 
-\item \textbf{Towards self-contact.} Build the simplest self-contact problem
+\exercise{Towards self-contact} Build the simplest self-contact problem
   you can: a thin strip, clamped at one end, pushed at the other until it
   folds over and touches itself. Use \op{impo 'MAIL'} with the surface given
   twice, and tune \op{crit} and \op{crit2} until the fold is detected without
@@ -581,9 +585,8 @@ presentation~\cite{Gornet:club2011} is the implementation reference.
   section~\ref{sec:ls:contact} into a worked example -- and it is a reasonable
   small project rather than a half-hour exercise.
 
-\item \textbf{Imperfection sensitivity of the cylinder.} Using the
+\exercise{Imperfection sensitivity of the cylinder} Using the
   imperfection construction above, compute the collapse load of the cylinder
   for imperfection amplitudes of $0$, $0.1t$, $0.5t$ and $t$, and plot it
   against the eigenvalue of chapter~\ref{chap:eigen}. The fall is the reason
   shell design codes do not use the linear buckling load.
-\end{enumerate}

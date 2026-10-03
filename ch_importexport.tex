@@ -1,8 +1,7 @@
-\chapter{\textbf{Input and output}}
+\chapter{Input and output}
 \label{chap:importexport}
 
-\section*{Outline}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+\framepart{Outline}
 
 This chapter covers everything that crosses the boundary of a
 \texttt{Cast3M} run: saving and restoring objects, exporting pictures,
@@ -106,10 +105,8 @@ Both act on the file declared by \op{opti lect} and \op{opti sort}
 respectively. \textbf{The two lists are not symmetric} -- several formats can
 be read but not written, and vice versa:
 
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{62mm}@{\hspace{4mm}}c@{\hspace{3mm}}c@{\hspace{2mm}}}
-\multicolumn{4}{c}{\textbf{Mesh and field exchange formats}} \\[2.mm]
+\begin{gbox}{Mesh and field exchange formats}
+\begin{tabular}{@{}>{\ttfamily}l@{\hspace{4mm}}p{95mm}@{\hspace{4mm}}c@{\hspace{3mm}}c@{}}
  & & \textbf{lire} & \textbf{sort} \\[1.mm]
 'MED'  & Salome MED, on HDF5; meshes and fields & $\bullet$ & $\bullet$ \\
 'AVS'  & AVS UCD unstructured cell data, ASCII  & $\bullet$ & $\bullet$ \\
@@ -121,8 +118,8 @@ be read but not written, and vice versa:
 'ABAQ' & ABAQUS input deck                      &           & $\bullet$ \\
 'VTK'  & Paraview \texttt{.vtu} / \texttt{.pvd} &           & $\bullet$ \\
 'EXCE' & spreadsheet-readable columns           &           & $\bullet$ \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent Note what is \emph{not} in that table: there is \textbf{no
 \texttt{'GMSH'} keyword}, and \texttt{Cast3M} does not read \textsc{gmsh}
@@ -212,10 +209,8 @@ on the \textbf{Utilitaires} page of the website, at
 \end{center}
 \noindent which convert directly:
 
-\begin{center}
-\fcolorbox{black}{Gray}{%
-\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{78mm}@{\hspace{2mm}}}
-\multicolumn{2}{c}{\textbf{Mesh conversion scripts}} \\[2.mm]
+\begin{gbox}{Mesh conversion scripts}
+\begin{tabular}{@{}>{\ttfamily}l@{\hspace{4mm}}p{108mm}@{}}
 msh2gibi.pl & \textsc{gmsh} mesh $\rightarrow$ \texttt{Cast3M} \\
 geo2gibi.pl & \textsc{gmsh} geometry $\rightarrow$ \texttt{Cast3M} \\
 cast2pos.pl & \texttt{Cast3M} $\leftrightarrow$ \textsc{gmsh} post-processing \\
@@ -224,8 +219,8 @@ cast2aba.pl & \texttt{Cast3M} $\rightarrow$ ABAQUS \\
 bulk2gibi.pl & CATIA/NASTRAN bulk data $\rightarrow$ \texttt{Cast3M} \\
 sam2cas.pl  & SAMCEF $\rightarrow$ \texttt{Cast3M} \\
 dxf2geo.pl  & DXF $\rightarrow$ \textsc{gmsh} or \texttt{Cast3M} \\
-\end{tabular}}
-\end{center}
+\end{tabular}
+\end{gbox}
 
 \noindent These produce a \texttt{.dgibi} file you simply include. They are
 convenient and they keep group names, but they are community tools of a
@@ -757,7 +752,7 @@ myresult = MYFIRST arg1 arg2;
 
 \op{exte[rieur]} \dindex{exte[rieur]}{call an exterior program} runs an
 external program from inside a \texttt{Cast3M} session, and
-\op{chau[ssette]} \dindex{chau[ssette]}{dynamic link with another program}
+\op{chau[ssette]} \dindex{chau[ssette]}{link to a running program}
 (fr. \emph{chaussette}, socket) opens a socket to another running program,
 which is the mechanism used for co-simulation and coupled multiphysics.
 
@@ -766,40 +761,42 @@ back -- for instance to call the Python post-processing of
 chapter~\ref{chap:python} at the end of a run, or to drive a parametric study
 from outside.
 
-\section*{Summary}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+\framepart{Summary}
 
-For \texttt{Cast3M}-to-\texttt{Cast3M} transfers use \op{sauv} and
-\op{rest}: they are lossless, fast and keep the object names, and they are
-what lets you split a study into a meshing file, a computation file and a
-post-processing file.
+\begin{gbox*}
+\begin{itemize}
+  \item \textbf{\texttt{Cast3M} to \texttt{Cast3M}: \op{sauv} and \op{rest}.}
+  Lossless, fast, and they keep the object names -- which is what lets you
+  split a study into a meshing file, a computation file and a
+  post-processing file.
+  \item \textbf{Everything else: \op{lire} and \op{sort[ir]}} -- and their
+  format lists are not symmetric, so check that the format you want exists
+  in the direction you want it.
+  \item \textbf{Coming in, prefer MED.} It is bidirectional, actively
+  maintained, and it keeps the group names that become your named
+  boundaries.
+  \item \textbf{Going out, prefer VTK.} \op{sort 'VTK'} and
+  \textsc{Paraview} will do more than the built-in window ever can.
+  \item \textbf{Check what arrived.} Whatever the route, plot the imported
+  mesh and check its area before computing on it.
+\end{itemize}
+\end{gbox*}
 
-For everything else the two operators are \op{lire} and \op{sort[ir]}, and
-their format lists are not symmetric. Coming in from another mesher, MED is
-the route to prefer -- it is bidirectional, actively maintained, and it keeps
-the group names that become your named boundaries. Going out to a
-visualisation tool, \op{sort 'VTK'} and \textsc{Paraview} will do more than
-the built-in window ever can. Whatever the route, plot the imported mesh and
-check its area before computing on it.
+\framepart{Exercises}
 
-\section*{Exercises}
-\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
-
-\begin{enumerate}
-\item \textbf{Round trip.} Mesh the plate with the hole in \textsc{gmsh},
+\exercise{Round trip} Mesh the plate with the hole in \textsc{gmsh},
   import it through MED, run the elastic computation, export the result with
   \op{sort 'VTK'} and display the von Mises stress in \textsc{Paraview}.
   Compare the stress concentration with the one obtained on the mesh built
   in chapter~\ref{chap:meshing}.
 
-\item \textbf{Mesh sensitivity across meshers.} Generate the same geometry
+\exercise{Mesh sensitivity across meshers} Generate the same geometry
   with triangles in \textsc{gmsh} and with quadrangles in \texttt{Cast3M}, at
   comparable numbers of degrees of freedom, and compare the maximum stress.
   Which element type is more accurate here, and why?
 
-\item \textbf{Your own output procedure.} Write a procedure
+\exercise{Your own output procedure} Write a procedure
   \op{@exportcsv} which takes a \op{table} of \op{evolution} objects and
   writes them as a single CSV file with one column per evolution and a header
   line. Use it on the time history of the first exercise of
   chapter~\ref{chap:heat}.
-\end{enumerate}

@@ -4,7 +4,8 @@ MAIN = castem
 
 all: $(MAIN).pdf
 
-$(MAIN).pdf: $(MAIN).tex $(wildcard ch_*.tex) $(MAIN).bib
+$(MAIN).pdf: $(MAIN).tex $(wildcard ch_*.tex) $(wildcard preamble/*) \
+              $(wildcard front/*) $(MAIN).bib
 	latexmk -pdf -interaction=nonstopmode -file-line-error $(MAIN)
 
 # The same gate the CI applies: latexmk exits 0 on an undefined reference or
