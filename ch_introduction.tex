@@ -1,0 +1,516 @@
+\chapter{\textbf{Introduction}}
+\label{chap:introduction}
+
+\section*{Outline}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+
+This chapter tells you what \texttt{Cast3M} is, how to install it, and how to
+run your first file. If you only want to get a \texttt{.dgibi} file supplied
+with a lecture to run on your own machine, read
+sections~\ref{sec:intro:install} and~\ref{sec:intro:running} and skip the rest
+until you need it.
+
+\section{Historical remarks}
+
+The CEA -- Commissariat à l'énergie atomique et aux énergies alternatives,
+Saclay, France (\url{https://www.cea.fr}) is a French government-funded
+technological research organisation, which has developed over the past forty
+years a dedicated toolbox for finite element computations: \texttt{Cast3M}.
+The toolbox contains the essential ingredients needed to perform a finite
+element computation. Its main application area is mechanics -- elasticity,
+elasto-visco-plasticity, and analyses adapted to equilibrium, buckling,
+vibration or dynamics problems. Other application areas include thermal,
+hydraulic and electromagnetic analysis. Its modular character makes it easy to
+program new applications, which makes the tool well adapted to coupled
+multiphysics problems.
+
+\texttt{Cast3M} is built on a family of \emph{objects}, i.e. data structures,
+and a lexicon of \emph{operators}, i.e. elementary operations acting on those
+objects. Together they form a specific programming language called
+\textsc{gibiane}. The code itself is written in an extended Fortran called
+\textsc{esope} which permits direct handling of the specific data structures.
+
+\section{The Cast3M website}
+\label{sec:intro:website}
+
+Essentially everything you will need is on
+\url{https://www-cast3m.cea.fr/}. It is worth spending ten minutes finding
+your way around it before you start, because the site -- not this booklet --
+is the authoritative and up-to-date reference. The pages you will use most
+are:
+
+\begin{center}
+\fcolorbox{black}{Gray}{%
+\begin{tabular}{@{\hspace{2mm}}l@{\hspace{4mm}}p{72mm}@{\hspace{2mm}}}
+\multicolumn{2}{c}{\textbf{Where to look on the Cast3M site}} \\[2.mm]
+\textbf{Notices} & the reference manual: one page per operator, about 1\,100 of
+them, with a full-text search over the notices \\[1.mm]
+\texttt{?page=notices} & \\[2.mm]
+\textbf{Exemples} & roughly 1\,600 searchable example files -- usually the
+fastest way to learn an operator \\[1.mm]
+\texttt{?page=exemples} & \\[2.mm]
+\textbf{Procédures} & the $\approx$560 standard procedures written in
+\textsc{gibiane} \\[1.mm]
+\texttt{?page=procedures} & \\[2.mm]
+\textbf{Téléchargement} & download and licence form \\[1.mm]
+\texttt{?xml=download1} & \\[2.mm]
+\textbf{Formations} & free CEA training sessions, and the course slides \\[1.mm]
+\texttt{?xml=formations} & \\[2.mm]
+\textbf{Utilitaires} & editor syntax files and the mesh conversion scripts \\[1.mm]
+\texttt{?xml=utilitaires} & \\[2.mm]
+\textbf{FAQ} & \texttt{?page=faqphp} \\
+\end{tabular}}
+\end{center}
+
+\noindent prefix each of these with
+\texttt{https://www-cast3m.cea.fr/index.php}, for instance
+\url{https://www-cast3m.cea.fr/index.php?page=notices}. A single operator
+notice can be reached directly, which is handy to bookmark:
+\url{https://www-cast3m.cea.fr/index.php?page=notices&notice=LIRE}.
+
+Two further resources did not exist when the first version of these notes was
+written and are worth knowing about:
+
+\begin{itemize}
+\item the \textbf{theory documentation}, rewritten as a modern searchable site
+  at \url{https://doc-cast3m.readthedocs.io/} (in French), covering
+  quasi-static and dynamic mechanics, concrete models, transient thermal
+  analysis and topology optimisation;
+\item the \textbf{user mailing list}, which is where questions actually get
+  answered. Write to
+  \texttt{cast3m-util@\allowbreak umontpellier.fr}; to subscribe, send
+  a message to \texttt{sympa@\allowbreak umontpellier.fr} containing the single line
+  \texttt{SUB cast3m-util \textit{Surname} \textit{Firstname}}, or use the web
+  interface \url{https://listes.umontpellier.fr/sympa}. For problems with the
+  code itself there is \texttt{support-cast3m@cea.fr}.
+\end{itemize}
+
+\noindent Note that the operator notices are written in French. Several
+documents aimed at beginners are available in English, in particular
+\emph{Starting with Cast3M} and \emph{The PASAPAS procedure}, both linked from
+the \textbf{Formations} page; an older but still useful introduction is
+Fichoux~\cite{Fichoux:1999}.
+
+\section{Obtaining and installing Cast3M}
+\label{sec:intro:install}
+
+\subsection*{Version numbering -- read this first}
+
+Releases are named after the year: the current one is \textbf{Cast3M 2026},
+internal version number \texttt{26.0}. Two consequences matter in daily use:
+
+\begin{itemize}
+\item \textbf{the executable carries the two-digit year}: you launch
+  \texttt{castem26}, not \texttt{castem}. A script written for an older
+  release will call \texttt{castem22} or \texttt{castem19} and will simply not
+  be found on your machine;
+\item \textbf{the environment variables carry it too}:
+  \texttt{CASTEM\_PROCEDUR26}, \texttt{CASTEM\_NOTICE26}.
+\end{itemize}
+
+\noindent In practice one release appears per year. Throughout this booklet
+\texttt{castem26} stands for whichever version you have installed -- substitute
+your own number.
+
+\subsection*{Licence and download}
+
+\texttt{Cast3M} is \textbf{free of charge for teaching and public research},
+but it is \emph{not} open-source software and it is not anonymous to download.
+You fill in a short form (name, email, institution, status -- student,
+doctoral candidate, teacher, \ldots\ -- and intended use) at
+\url{https://www-cast3m.cea.fr/index.php?xml=download1} and accept the
+\emph{Contrat de licence Cast3M « Éducation \& Recherche »}. The practical
+points of that licence:
+
+\begin{itemize}
+\item use is restricted to teaching and research; providing services to third
+  parties, and any commercial or advertising use, is excluded (a commercial
+  licence exists separately);
+\item the licence runs for five years and covers one workstation, or one
+  server accessible to a single research or teaching team;
+\item you may not pass the software on to anyone else -- \textbf{send your
+  students to the download page, do not redistribute the archive};
+\item the sources are supplied and you may modify them, but anything you
+  submit back for integration is assigned to the CEA;
+\item publications using \texttt{Cast3M} must cite it and name the CEA as the
+  holder of the intellectual property rights.
+\end{itemize}
+
+\subsection*{Installation}
+
+The distribution is a self-contained archive with an installer script inside;
+there is nothing to compile. Unpack it, read the \texttt{Readme.txt} /
+\texttt{Lisez-moi.txt} it contains, and run the installer:
+
+\begin{center}
+\fcolorbox{black}{Gray}{%
+\begin{tabular}{@{\hspace{2mm}}l@{\hspace{4mm}}l@{\hspace{4mm}}p{58mm}@{\hspace{2mm}}}
+\multicolumn{3}{c}{\textbf{Installation}} \\[2.mm]
+\textbf{Platform} & \textbf{Installer} & \textbf{Notes} \\[1.mm]
+GNU/Linux & \texttt{INSTALL\_CAST3M.sh} & \texttt{tar} archive; run the script \\[1.mm]
+Windows   & \texttt{INSTALL\_CAST3M.bat} & \texttt{zip} archive; double-click \\[1.mm]
+macOS     & \texttt{INSTALL\_CAST3M.sh} & \texttt{tar} archive; needs Xcode, then
+                                          \texttt{sudo xcodebuild -license} \\
+\end{tabular}}
+\end{center}
+
+\noindent A graphical installer then takes over and sets the environment up
+for you. Three remarks:
+
+\begin{itemize}
+\item \textbf{macOS is now officially supported.} On Apple Silicon (ARM64)
+  the current version is available like on the other platforms -- no virtual
+  machine, no Docker, no self-compilation. The situation described in earlier
+  editions of these notes, where Mac users relied on unofficial builds, is
+  obsolete. Intel Macs, however, are frozen at version \texttt{22.0}.
+\item \textbf{There is no official Docker image and no conda package}, despite
+  what you may find in forum posts.
+\item On Windows, older notes told you to create \texttt{C:\textbackslash tmp}
+  by hand and to set a \texttt{CASTEM} variable. The current installer handles
+  this; only fall back on manual settings if it fails.
+\end{itemize}
+
+\subsection*{Environment variables}
+
+You should not normally have to set these yourself, but they are what the
+installer configures and what you will need if you move an installation or run
+on a cluster:
+
+\begin{center}
+\fcolorbox{black}{Gray}{%
+\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{95mm}@{\hspace{2mm}}}
+\multicolumn{2}{c}{\textbf{Environment variables}} \\[2.mm]
+CASTEM\_PROCEDUR26 & directory the standard procedures are read from \\
+CASTEM\_NOTICE26   & directory the operator notices are read from \\
+ESOPE\_PARAM       & size of the \textsc{esope} central memory zone, in machine
+                     words \\
+\end{tabular}}
+\end{center}
+
+\noindent Procedures are looked up in the current directory first, then in
+\texttt{./procedur}, then in the installation directory -- which is why you can
+override a standard procedure simply by dropping your own copy next to your
+\texttt{.dgibi} file.
+
+If a long computation stops with a message of the form
+
+\begin{center}\texttt{--- GEMAT ERROR --- \ldots\ SEGINI, IBLIS --- PAS ASSEZ DE
+PLACE EN MEMOIRE}\end{center}
+
+\noindent it has run out of \textsc{esope} memory. Increase
+\texttt{ESOPE\_PARAM}, but keep it below your physical RAM or the machine will
+swap and the run will become slower than useless. Inside a file the related
+settings are \op{opti 'PLAC' n;} (minimum free memory to maintain, default
+$P_{tot}/10$) and \op{opti 'NGMA' n;} (maximum matrix size in words, default
+$100\,000$).
+
+\medskip
+\noindent\emph{A note for readers of the older edition:} the
+\texttt{castem -m XL} memory option described there no longer appears in the
+current documentation. Use \texttt{ESOPE\_PARAM} instead.
+
+\section{Running Cast3M}
+\label{sec:intro:running}
+
+There are two ways to run the program, and you will use both.
+
+\begin{castemcom}
+Launching \texttt{castem26} with a file name executes the commands in that
+file and then \textbf{returns the hand to you} in an interactive
+\textsc{gibiane} session, where you can go on typing commands against the
+objects the file has just built. This is the normal way to work: put the
+computation in a file, then explore the results interactively.
+
+Technically the program copies \texttt{myfile.dgibi} into \texttt{fort.3}
+(logical unit 3) and reads it, then reads what you type from \texttt{fort.98}
+(logical unit 98).
+
+\medskip
+Two consequences worth remembering. First, after a crash \texttt{fort.98}
+still holds everything you typed, which is often the quickest way to recover
+your work -- but it is wiped at the next start. Second, both files live in the
+working directory, so \textbf{do not run two Cast3M sessions in the same
+directory} at the same time: they will fight over the same files.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+$ castem26 myfile.dgibi
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Launched without an argument, the program goes straight to the interactive
+prompt. Each line you type is echoed back prefixed with \texttt{*}.
+
+\medskip
+Useful while you are getting started, and for trying out a single operator,
+but anything you want to keep belongs in a file.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+$ castem26
+ ...
+$ a = 3;
+* a = 3;
+$
+\end{verbatim}
+\end{castemlines}
+
+\noindent Once the program is running, a few commands are worth memorising:
+
+\begin{itemize}
+\item \op{fin;} stops the program;
+\item \op{opti donn 5;} placed inside \texttt{myfile.dgibi} interrupts the
+  reading of the file at that point and gives you the hand -- the single most
+  useful debugging trick in \textsc{gibiane}, since it lets you stop in the
+  middle of a computation and inspect the objects built so far;
+\item \op{opti donn 3;} typed at the prompt hands control back to the file;
+\item \op{info \textit{operator};} prints the notice of an operator in the
+  terminal (in French). \op{aide} and \op{noti} do related things.
+\end{itemize}
+
+\noindent A further useful invocation is \texttt{castem26 -test}, which runs
+the test-case suite -- a quick way to confirm that an installation is sane.
+
+\section{Editing gibiane files}
+\label{sec:intro:editing}
+
+A \texttt{.dgibi} file is plain ASCII text, so any editor will do, but syntax
+highlighting catches a surprising number of mistakes before you run anything.
+Configuration files for a long list of editors are on the
+\textbf{Utilitaires} page of the website. Two are worth singling out:
+
+\begin{itemize}
+\item \textbf{Visual Studio Code}, with the \texttt{gibiane-vscode} extension
+  (\url{https://github.com/charles-zablit/gibiane-vscode}), which adds
+  highlighting, completion and go-to-definition. This is the recommendation
+  for anyone starting today;
+\item \textbf{Vim}, \textbf{Emacs}, \textbf{Notepad++}, \textbf{Kate},
+  \textbf{gedit} and \textbf{Geany} all have published syntax files.
+\end{itemize}
+
+\noindent Whatever you use, \textbf{switch off tab characters}: a literal
+\texttt{TAB} in a \texttt{.dgibi} file causes reading errors that are tedious
+to diagnose.
+
+\section{Structure of the program}
+
+From the programming point of view \texttt{Cast3M} has two levels:
+
+\begin{itemize}
+\item a compiled low-level language, \textsc{esope}. This is invisible to the
+  normal user; it is the language of the authors of \texttt{Cast3M}. It is a
+  derivative of \textsc{fortran} enriched with operations for the manipulation
+  of specific objects (creation, copy, removal, \ldots\ of data structures).
+\item a high-level interpreted language, \textsc{gibiane}, formed by a lexicon
+  of operations, which is the language of the normal user and the one
+  exemplified throughout this text.
+\end{itemize}
+
+\noindent From this point of view \texttt{Cast3M} is comparable with
+\textsc{Matlab}, \textsc{Scilab}, \textsc{Octave}, \textsc{Mathematica} or
+\textsc{Maple}: \textsc{esope} is the language of the creator and
+\textsc{gibiane} the language of the user.
+
+Two extension routes exist if \textsc{gibiane} is not enough. New operators
+are written in \textsc{esope}. New \emph{material laws}, on the other hand,
+are nowadays written with \textbf{MFront}
+(\url{https://thelfer.github.io/tfel/web}), an open-source code generator
+developed at the CEA and bundled with \texttt{Cast3M}; it plugs in through the
+generic \texttt{UMAT} interface and saves you from writing \textsc{esope} for
+what is the most common reason to want to extend a finite element code.
+
+The essence of \textsc{gibiane} can be summarised in one line:
+
+\begin{castemcom}
+The \texttt{;} marks the end of the command and makes the system execute the
+operator with \texttt{objet\_1} as its argument, creating a new object
+\texttt{objet\_2} as the result.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+objet_2 = operator objet_1 ;
+\end{verbatim}
+\end{castemlines}
+
+\noindent The basic syntax rules of \textsc{gibiane} are:
+
+\begin{itemize}
+\item operator names are defined by their first 4 characters, so \op{vibr}
+  denotes the \op{vibr[ation]} operator; spelling the name out in full is
+  still permitted;
+\item object names should be at most 8 characters, and their first 4
+  characters should not coincide with an operator name -- that would shadow
+  the operator;
+\item a statement may run over several lines, with no continuation character
+  needed, up to a limit of 500 characters in total. Individual lines should
+  stay within 72 characters;
+\item \textbf{there is no operator precedence}: operations are executed in
+  order of appearance, so
+  \[ \op{a + b * c} \;=\; \op{(a + b) * c} \;\neq\; \op{a + (b * c)} \]
+  Use brackets systematically in algebraic expressions. This is the single
+  most common source of silently wrong results for newcomers;
+\item upper and lower case are not distinguished, except inside quoted
+  strings: \op{vibr}, \op{Vibr} and \op{VIBR} are the same operator, but
+  \texttt{'SMYY'} and \texttt{'smyy'} are not the same string;
+\item a \texttt{*} in the first column starts a comment;
+\item tab characters and invisible characters inserted by some editors must be
+  avoided, as they create file-reading errors.
+  \sindex{editors (editeurs, outils)}
+\end{itemize}
+
+\subsection*{Objects}
+
+Objects are numerical or logical values organised in data structures
+describing mathematical and physical fields. The classical ones describing
+numbers are:
+
+\begin{itemize}
+\item \op{entier} \dindex{entier}{integer} is an integer, written without a
+  \texttt{.};
+\item \op{flottant} \dindex{flottant}{real number} is a real number, written
+  either as \texttt{123.4} or as \texttt{1.234e2} $=1.234\times10^{2}$;
+\item \op{logique} \dindex{logique}{logical value} are logical objects used in
+  boolean operations, with the two values \texttt{VRAI} (true) and
+  \texttt{FAUX} (false).
+\end{itemize}
+
+\noindent Numbers and strings can be organised in lists:
+
+\begin{itemize}
+\item \op{listenti[er]} \dindex{listentier}{list of integers} a list of
+  integers, assembled with \op{lect[ure]}: \sindex{lect[ure]}
+  \op{mylist = lect 1 6 89;}
+\item \op{listreel} \dindex{listreel}{list of real numbers} a list of reals,
+  assembled with \op{prog[ramer]}: \sindex{prog[ramer]}
+  \op{mylist = prog 1. 6.e3 8.9;}
+\item \op{listmots} \dindex{listmots}{list of strings} a list of strings
+  (fr. \emph{mots}, words), assembled with \op{mots}: \sindex{mots}
+  \op{mylist = mots 'TITI' 'Toto' 'tete';}
+\end{itemize}
+
+\begin{optable}{Creating lists of objects}
+lect & lists of integers \\
+prog & lists of reals \\
+mots & lists of strings \\
+table & generalised list, indexed by integers or strings \\
+\end{optable}
+
+\noindent The \op{table} deserves a special mention because it is used
+everywhere in practice: it is a generalised list whose indices may be integers
+or strings, and it is how \op{pasapas} returns the results of a nonlinear
+computation (chapter~\ref{chap:plasticity}).
+
+Another class of objects is specific to a finite element computation:
+
+\begin{itemize}
+\item the \op{maillage} \dindex{maillage}{mesh} (mesh) is described by an
+  element type -- \texttt{SEG2}, \texttt{TRI3}, \texttt{QUA4}, \ldots\ -- a
+  list of nodes and their connectivity;
+\item a \op{chpoint} \dindex{chpoint}{nodal field}, i.e. \emph{champ par
+  point}, is a scalar, vector or tensor field defined by its values at the
+  nodes of a mesh: temperature, displacement, \ldots;
+\item a \op{mchaml} \dindex{mchaml}{field on elements}, i.e. \emph{champ par
+  élément}, is a field defined by its values at specific points of each
+  element -- typically the Gauss integration points, where stresses, strains
+  and temperature gradients live;
+\item a \op{rigidite} \dindex{rigidite}{stiffness} (stiffness) is a stiffness
+  matrix, possibly carrying a set of preconditioners.
+\end{itemize}
+
+\noindent The distinction between \op{chpoint} and \op{mchaml} is the one
+beginners stumble over most often: a displacement is a \op{chpoint}, a stress
+is a \op{mchaml}, and plotting or combining them requires passing the mesh in
+the first case and the model in the second.
+
+\subsection*{Operators}
+
+Elementary operators perform a large class of actions:
+
+\begin{itemize}
+\item \op{+}, \op{*}, \op{/}, \op{-}, \op{**} are algebraic operators and
+  apply equally to numbers and to fields, whether defined at nodes
+  (\op{chpoint}) or on elements (\op{mchaml});
+\item \op{droi[te]} \dindex{droi[te]}{line}, \op{cerc[le]}
+  \dindex{cerc[le]}{circle}, \op{surf[ace]} \dindex{surf[ace]}{surface},
+  \op{dall[er]} \dindex{dall[er]}{tiling 2D} construct lines, circles and
+  surfaces starting from given points or contours;
+\item \op{plus} \sindex{plus} performs a translation by a given vector and
+  applies both to a \op{mchaml} and to a geometry;
+\item \op{reso[udre]} \dindex{reso[udre]}{solve} solves $KX=Y$, with $K$ a
+  symmetric positive definite matrix of \op{rigidite} type and $X$, $Y$ nodal
+  fields;
+\item \op{vibr[ation]} \dindex{vibr[ation]}{eigenvalue problem, vibration} solves the eigenvalue problem
+  $KX-\lambda MX=0$;
+\item \op{masq[uer]} \dindex{masq[uer]}{mask, characteristic function} selects
+  the values of a field with respect to a user-defined criterion.
+\end{itemize}
+
+\noindent Other operators are purely algorithmic:
+
+\begin{itemize}
+\item \op{si} \dindex{si}{if}, \op{sinon} \dindex{sinon}{else}, \op{finsi}
+  \dindex{finsi}{endif} are the classical control statements, equivalent to
+  \texttt{if}, \texttt{else}, \texttt{endif};
+\item \op{repe[ter]} \dindex{repe[ter]}{do, start}, \op{fin}
+  \dindex{fin}{end} define a loop, corresponding to \texttt{do} \ldots\
+  \texttt{enddo};
+\item \op{debpr[ocedure]} \dindex{debpr[ocedure]}{subroutine, start} and
+  \op{finp[roc]} \dindex{finp[roc]}{subroutine, end} define a
+  \emph{procédure}, the equivalent of a subroutine or function.
+\end{itemize}
+
+\noindent There are two basic graphical operators:
+
+\begin{itemize}
+\item \op{dess[iner]} \dindex{dess[iner]}{draw} plots a curve from lists of
+  abscissae and ordinates;
+\item \op{trac[er]} \dindex{trac[er]}{plot} displays a mesh, or isolines or
+  isocolours of a field defined on a mesh.
+\end{itemize}
+
+\noindent A number of operators are complex manipulations of the data
+structure and are themselves written in \textsc{gibiane}:
+
+\begin{itemize}
+\item \op{pasapas} \dindex{pasapas}{step-by-step, incremental problem}
+  incrementally solves nonlinear problems under the small and large strain
+  assumptions -- contact, elastoplasticity, and so on;
+\item the buckling problem is the eigenvalue problem $KX-\lambda K_{G}X=0$
+  with $K$ and $K_{G}$ the stiffness and geometrical stiffness matrices. It is
+  solved by the \op{flambage} \sindex{flambage} \emph{procedure}, which
+  assembles the matrices and passes the problem to the eigenvalue solver
+  (chapter~\ref{chap:eigen}).
+
+  \medskip
+  \textbf{Beware of the name.} \op{flambage} must be written out in full.
+  The four-letter abbreviation \op{flam} is a \emph{different operator
+  altogether} -- it integrates the combustion of a hydrogen--oxygen mixture --
+  so \op{flam} in a buckling computation does not fail with a helpful message,
+  it calls the wrong thing. This is the one place in \textsc{gibiane} where
+  the four-character rule will actively mislead you.
+\end{itemize}
+
+\noindent Finally, a feature absent from older editions of these notes:
+\texttt{Cast3M} runs in \textbf{parallel}. Setting \op{opti 'PARA' VRAI;} and
+\op{opti 'ASSI' n;} (number of assistants) distributes the heavy operations
+over up to 128 cores. For the problem sizes in this booklet it makes no
+difference, but it matters as soon as you move to three-dimensional models.
+
+In the next chapters we present a series of programming examples illustrating
+on the one hand the usage of the \texttt{Cast3M} environment and on the other
+hand the programming of classical finite element algorithms. From the
+practical point of view, however, do not forget that most classical problem
+settings in mechanics already have dedicated operators.
+
+\section*{Summary}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+
+You should now be able to install \texttt{Cast3M}, launch it on a file and
+get the hand back at the interactive prompt, and read the notice of any
+operator. The three things worth carrying into the next chapters are: the
+executable is \texttt{castem26}, not \texttt{castem}; a statement ends at the
+\texttt{;} and brackets are compulsory because there is no operator
+precedence; and the distinction between a field at the nodes
+(\op{chpoint}) and a field on the elements (\op{mchaml}) governs almost
+every plotting and combination error you will make.

@@ -1,0 +1,35 @@
+# LaTeX build artefacts -----------------------------------------------------
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.synctex.gz
+*.toc
+*.nav
+*.snm
+*.vrb
+
+# The PDF is built by CI and attached to releases, not committed.
+# Delete this line if you would rather track it.
+castem.pdf
+
+# Cast3M leaves these in the working directory
+fort.*
+UTILPROC
+*.dgibi.log
+
+# editors and OS
+*~
+*.bak
+*.swp
+.DS_Store
+._*
+__MACOSX/

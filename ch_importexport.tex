@@ -1,0 +1,805 @@
+\chapter{\textbf{Input and output}}
+\label{chap:importexport}
+
+\section*{Outline}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+
+This chapter covers everything that crosses the boundary of a
+\texttt{Cast3M} run: saving and restoring objects, exporting pictures,
+reading measurement data, writing results to a file, loading your own
+procedures, and -- the section most people arrive here for -- getting a mesh
+built in another program into \texttt{Cast3M}.
+
+\section{Saving and restoring \texttt{Cast3M} objects}
+
+\begin{castemcom}
+Saving \texttt{Cast3M} objects to an external file is done with
+\op{sauv[er]} \dindex{sauv[er]}{save data in a file} (fr. \emph{sauver}).
+
+The option first declares the output file in the working directory. The
+string form is what preserves lower and upper case, so the file name comes
+out as you wrote it; a directory path may also be given.
+
+\op{sauv} is then followed by the objects to be saved -- here the mesh
+\op{plate} and the displacement \op{u}. The program also saves, silently, all
+the underlying objects they depend on, which is why the listing reports many
+more objects than you named: saving a displacement field drags in its mesh
+and all its points.
+
+Called with no argument, \op{sauv;} saves the entire session.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti sauv 'my_file.dat';
+sauv plate u;
+
+ LA PILE NUMERO  1 CONTIENT 19 OBJET(S) MAILLAG
+  IL Y A  10 OBJET(S) NOMME(S) :
+ LA PILE NUMERO  2 CONTIENT   1 OBJET(S) CHPOINT
+  IL Y A   1 OBJET(S) NOMME(S) :
+ LA PILE NUMERO 27 CONTIENT   1 OBJET(S) MOT
+ LA PILE NUMERO 32 CONTIENT 494 OBJET(S) POINT
+  IL Y A   6 OBJET(S) NOMME(S) :
+ LA PILE NUMERO 33 CONTIENT  1 OBJET(S) CONFIGU
+ Fin normale de la sauvegarde
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Data saved with \op{sauv[er]} is recovered with \op{rest[ituer]}
+\dindex{rest[ituer]}{recover data from a file}. The option sets the file to
+be read and the bare command imports its whole contents; all objects come
+back with their previous names.
+
+Check the \texttt{DIMENSION} echoed on the second line of the output: it is
+the dimension the objects were saved with, and it must match the
+\op{opti dime} of the run reading them.
+
+
+This pair is the right way to split a long study into stages: mesh in one
+file, computation in a second, post-processing in a third. It is also much
+faster and completely lossless compared with any exchange format, so for
+\texttt{Cast3M}-to-\texttt{Cast3M} transfers always prefer
+\op{sauv}/\op{rest} over \op{sort}/\op{lire}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti rest 'my_file.dat';
+rest;
+
+ NIVEAU DU FICHIER 16
+ NIVEAU D'ERREUR 0  DIMENSION 2
+ DENSITE 0.00000E+00
+ LECTURE DE  19 OBJETS MAILLAGE
+ LECTURE DE   1 OBJETS CHPOINT
+ LECTURE DE   1 OBJETS MOT
+ LECTURE DE 494 OBJETS POINT
+ LECTURE DE   1 OBJETS CONFIGUR
+ FIN DE LECTURE DU LABEL :
+ LABEL AUTOMATIQUE :  1
+ Fin normale de la restitution
+\end{verbatim}
+\end{castemlines}
+
+\noindent The default format is binary. \op{opti sauv 'f.dat' 'FORMAT';}
+writes a portable text file instead -- slower and larger, but readable and
+transferable between machines; \texttt{'XDR'} is the portable binary
+alternative. Restoring must use the matching keyword on \op{opti rest}.
+
+\section{Mesh import and export, format exchange}
+\label{sec:io:meshexchange}
+
+\cindex{mesh import}\cindex{mesh export}\cindex{gmsh}%
+\cindex{MED format}\cindex{UNV format}\cindex{AVS format}%
+\cindex{Salome}\cindex{physical group (gmsh)}%
+Sooner or later you will want to mesh in a dedicated mesher and compute in
+\texttt{Cast3M}. The meshing operators of chapter~\ref{chap:meshing} are
+perfectly adequate for the academic geometries of this booklet, but for a
+real CAD geometry you want \textsc{gmsh}, \textsc{Salome} or a commercial
+pre-processor.
+
+\subsection{What \texttt{Cast3M} can read and write}
+
+Two operators do the work: \op{lire} \dindex{lire}{read an external file} for
+import and \op{sort[ir]} \dindex{sort[ir]}{write an external file} for export.
+Both act on the file declared by \op{opti lect} and \op{opti sort}
+respectively. \textbf{The two lists are not symmetric} -- several formats can
+be read but not written, and vice versa:
+
+\begin{center}
+\fcolorbox{black}{Gray}{%
+\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{62mm}@{\hspace{4mm}}c@{\hspace{3mm}}c@{\hspace{2mm}}}
+\multicolumn{4}{c}{\textbf{Mesh and field exchange formats}} \\[2.mm]
+ & & \textbf{lire} & \textbf{sort} \\[1.mm]
+'MED'  & Salome MED, on HDF5; meshes and fields & $\bullet$ & $\bullet$ \\
+'AVS'  & AVS UCD unstructured cell data, ASCII  & $\bullet$ & $\bullet$ \\
+'UNV'  & I-DEAS universal file                  & $\bullet$ &           \\
+'NAS'  & NASTRAN bulk data                      & $\bullet$ & $\bullet$ \\
+'FEM'  & Altair OptiStruct / HyperMesh          & $\bullet$ &           \\
+'STL'  & stereolithography, gives a TRI3 mesh   & $\bullet$ & $\bullet$ \\
+'CSV'  & plain text columns                     & $\bullet$ &           \\
+'ABAQ' & ABAQUS input deck                      &           & $\bullet$ \\
+'VTK'  & Paraview \texttt{.vtu} / \texttt{.pvd} &           & $\bullet$ \\
+'EXCE' & spreadsheet-readable columns           &           & $\bullet$ \\
+\end{tabular}}
+\end{center}
+
+\noindent Note what is \emph{not} in that table: there is \textbf{no
+\texttt{'GMSH'} keyword}, and \texttt{Cast3M} does not read \textsc{gmsh}
+\texttt{.msh} files natively. Note also that \texttt{'UNV'} can be read but
+not written -- the FAQ on the website claims otherwise, but the notice of
+\op{sort} is authoritative and has no \texttt{'UNV'}. To produce a UNV file,
+use the \texttt{cast2unv.pl} script mentioned below.
+
+\subsection{Importing a gmsh mesh}
+\label{sec:io:gmsh}
+
+There are three routes. They are listed in the order in which you should try
+them.
+
+\paragraph{Route 1 -- via MED (recommended).} MED is the best-supported
+exchange format in current \texttt{Cast3M}: the MED library is bundled with
+the distribution, it is actively maintained, it is the native format of
+\textsc{Salome}, and it carries fields as well as meshes, in both directions.
+\textsc{gmsh} writes it directly.
+
+In \textsc{gmsh}, either choose \texttt{File} $\rightarrow$ \texttt{Export}
+and give the file a \texttt{.med} extension, or add \texttt{Save "plate.med";}
+at the end of your \texttt{.geo} file, or convert an existing mesh from the
+command line:
+
+\begin{codebox}
+\begin{verbatim}
+$ gmsh plate.geo -2 -o plate.med        # mesh and write MED in one go
+$ gmsh plate.msh -o plate.med           # convert an existing .msh
+\end{verbatim}
+\end{codebox}
+
+\begin{castemcom}
+\op{lire 'MED'} returns a \op{table}, not a bare mesh: a MED file may hold
+several meshes, several element types and several fields, and the table is
+indexed by their names.
+
+List it first -- \op{list tab1;} -- to see what the file actually contains,
+then pick what you need. This is the step everyone skips and then wonders why
+the import ``failed''.
+
+\medskip
+Assigning names in the mesher pays off here. In \textsc{gmsh} a
+\emph{physical group} named \texttt{TROU} becomes an entry you can address by
+that name, which is how you get boundaries you can apply \op{bloq} and
+\op{pres} to. Without physical groups you get an anonymous mesh and have to
+recover boundaries geometrically with \op{poin} and \op{elem}, as in
+chapter~\ref{chap:meshing}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti dime 2 elem tri3;
+
+tab1 = lire 'MED' 'plate.med';
+
+list tab1;
+
+dom  = tab1 . 'PLAQUE';
+trou = tab1 . 'TROU';
+bas  = tab1 . 'BAS';
+
+trace (dom et (trou coul rouge));
+\end{verbatim}
+\end{castemlines}
+
+\paragraph{Route 2 -- via UNV.} If MED is unavailable -- an older
+\textsc{gmsh} build without MED support, for instance -- the I-DEAS universal
+file is the fallback. \textsc{gmsh} always writes it:
+
+\begin{codebox}
+\begin{verbatim}
+$ gmsh plate.geo -2 -o plate.unv
+\end{verbatim}
+\end{codebox}
+
+\noindent and \op{lire 'UNV' 'plate.unv';} reads it. Two cautions. First,
+\textsc{gmsh} writes its named groups in UNV dataset 2477, and readers differ
+in which group dataset they accept, so check that your named boundaries
+actually survived before relying on them. Second, UNV import is read-only --
+you cannot write the result back out in the same format.
+
+\paragraph{Route 3 -- the conversion scripts.} The CEA publishes a set of
+Perl scripts, in large part due to Laurent Champaney~\cite{Champaney:2007},
+on the \textbf{Utilitaires} page of the website, at
+\begin{center}
+\url{https://www-cast3m.cea.fr/index.php?xml=utilitaires}
+\end{center}
+\noindent which convert directly:
+
+\begin{center}
+\fcolorbox{black}{Gray}{%
+\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{4mm}}p{78mm}@{\hspace{2mm}}}
+\multicolumn{2}{c}{\textbf{Mesh conversion scripts}} \\[2.mm]
+msh2gibi.pl & \textsc{gmsh} mesh $\rightarrow$ \texttt{Cast3M} \\
+geo2gibi.pl & \textsc{gmsh} geometry $\rightarrow$ \texttt{Cast3M} \\
+cast2pos.pl & \texttt{Cast3M} $\leftrightarrow$ \textsc{gmsh} post-processing \\
+cast2unv.pl & \texttt{Cast3M} $\rightarrow$ I-DEAS UNV \\
+cast2aba.pl & \texttt{Cast3M} $\rightarrow$ ABAQUS \\
+bulk2gibi.pl & CATIA/NASTRAN bulk data $\rightarrow$ \texttt{Cast3M} \\
+sam2cas.pl  & SAMCEF $\rightarrow$ \texttt{Cast3M} \\
+dxf2geo.pl  & DXF $\rightarrow$ \textsc{gmsh} or \texttt{Cast3M} \\
+\end{tabular}}
+\end{center}
+
+\noindent These produce a \texttt{.dgibi} file you simply include. They are
+convenient and they keep group names, but they are community tools of a
+certain age -- if one of them chokes on a file, fall back on route 1.
+
+\subsection{A complete worked example}
+
+The following \textsc{gmsh} geometry file reproduces the quarter plate with a
+hole of chapter~\ref{chap:meshing}. Put it in \texttt{plate.geo}:
+
+\begin{codebox}
+\begin{verbatim}
+L = 1.0;  r = 0.1;  lc = 0.03;
+
+Point(1) = {0, 0, 0, lc};         // centre of the hole
+Point(2) = {r, 0, 0, lc};
+Point(3) = {L, 0, 0, lc};
+Point(4) = {L, L, 0, lc};
+Point(5) = {0, L, 0, lc};
+Point(6) = {0, r, 0, lc};
+
+Line(1) = {2, 3};   Line(2) = {3, 4};
+Line(3) = {4, 5};   Line(4) = {5, 6};
+Circle(5) = {6, 1, 2};
+
+Curve Loop(1) = {1, 2, 3, 4, 5};
+Plane Surface(1) = {1};
+
+// named groups -> named sub-meshes after import
+Physical Curve("BAS")    = {1};
+Physical Curve("DROITE") = {2};
+Physical Curve("HAUT")   = {3};
+Physical Curve("GAUCHE") = {4};
+Physical Curve("TROU")   = {5};
+Physical Surface("PLAQUE") = {1};
+\end{verbatim}
+\end{codebox}
+
+\noindent Mesh it and export, then read it and carry straight on with the
+elastic computation of chapter~\ref{chap:elasticity}:
+
+\begin{codebox}
+\begin{verbatim}
+$ gmsh plate.geo -2 -o plate.med
+\end{verbatim}
+\end{codebox}
+
+\begin{castemcom}
+Everything downstream is unchanged: once the mesh and its named boundaries
+are in \texttt{Cast3M} objects, the model, material, boundary conditions and
+solution are exactly the ones of chapter~\ref{chap:elasticity}.
+
+That is the point of this section. Changing the mesher changes the first ten
+lines of your file and nothing else.
+
+\medskip
+Two things to check on any imported mesh before computing with it: that
+\op{opti dime} and \op{opti elem} match what the file contains (a 2D mesh
+read with \op{opti dime 3} gives a surface in space), and that the geometry
+is where you think it is -- \op{trace} it, and verify the area with
+\op{mesu}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti dime 2 elem tri3;
+
+tab1 = lire 'MED' 'plate.med';
+dom  = tab1 . 'PLAQUE';
+d12  = tab1 . 'BAS';
+d23  = tab1 . 'DROITE';
+d34  = tab1 . 'HAUT';
+d41  = tab1 . 'GAUCHE';
+trou = tab1 . 'TROU';
+ldom = 1.;
+
+list (mesu dom 'SURF');
+
+mod = dom mode mecanique
+          elastique isotrope;
+mat = mod mate 'YOUN' 2.e11 'NU' 0.3;
+KK  = rigi mod mat;
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Exporting a mesh and a field: the AVS round trip}
+
+The simplest exchange format \texttt{Cast3M} both reads and writes is AVS UCD,
+a plain-text format. It is worth knowing because it is readable, so it is the
+one to reach for when you want to see what was actually exported.
+
+\begin{castemcom}
+\op{opti sort[ir]} sets \op{mon\_fichier} as the standard write file, and
+\op{sort[ir]} writes the data structure of the mesh \op{dom} -- nodal
+coordinates and connectivity -- together with the displacement field \op{u}.
+\texttt{'AVS'} is the keyword selecting the output format.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti sort 'mon_fichier';
+
+sort 'AVS' dom u;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+To recover the data, set the reading file with \op{opti lect} and call
+\op{lire}, which returns a \op{table}. The indices \op{lemailla} and
+\op{lechpoin} hold the mesh (\emph{le maillage}) and the nodal field
+(\emph{le champ par points}) respectively.
+
+As always after an import, check the result by plotting both the mesh and one
+component of the field rather than assuming the transfer worked.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti lect 'mon_fichier';
+
+tab = lire 'AVS';
+
+trace (tab . lemailla);
+trace (tab . lemailla)
+      (exco (tab . lechpoin) 'UX');
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Exporting results to Paraview}
+
+For three-dimensional results, or simply for better pictures than the
+built-in viewer gives, export to \textsc{Paraview}:
+
+\begin{castemcom}
+\op{sort 'VTK'} writes a \texttt{.vtu} file readable by \textsc{Paraview} and
+by most modern visualisation tools. Several time steps can be collected into
+a \texttt{.pvd} series.
+
+This is worth knowing even for 2D work: \textsc{Paraview} gives you warped
+geometry, arbitrary slices, streamlines, animation and publication-quality
+output that the \texttt{Cast3M} window cannot produce.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti sort 'result.vtu';
+sort 'VTK' mod u sig;
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Animating a transient computation}
+\label{sec:io:movie}
+
+\cindex{animation}\cindex{time series, exporting}%
+A transient computation -- the heating of
+chapter~\ref{chap:heat}, or the \op{pasapas} run of
+chapter~\ref{chap:plasticity} -- produces one field per time step, and the
+natural way to look at it is as an animation. The recipe is to write one
+\texttt{.vtu} file per step and collect them into a \texttt{.pvd} series
+that \textsc{Paraview} opens as a single time-dependent dataset.
+
+\begin{castemcom}
+Inside the time loop, \op{chai[ne]} builds a different file name at each
+step and \op{opti sort} redirects to it. The step number must be
+zero-padded, or \texttt{res10} will sort before \texttt{res2}.
+
+The \texttt{.pvd} file is a small XML index listing the time value of each
+\texttt{.vtu}; writing it from \textsc{gibiane} with \op{mess} is the
+simplest route, and the loop below does exactly that.
+
+\medskip
+Open \texttt{result.pvd} in \textsc{Paraview}, apply a
+\emph{Warp By Vector} filter, press play, and use \emph{Save Animation} to
+write a film or an image sequence. For a figure in a report, \emph{Save
+Screenshot} at a large resolution is usually better than a film.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* -- one .vtu per step --
+repeter bsort ndt;
+  n   = &bsort;
+  nom = chai 'res_' n '.vtu';
+  opti sort nom;
+  sort 'VTK' mod (U . n) (sig . n);
+fin bsort;
+
+* -- the .pvd index --
+opti sort 'result.pvd';
+mess '<?xml version="1.0"?>';
+mess '<VTKFile type="Collection">';
+mess '<Collection>';
+repeter bpvd ndt;
+  n = &bpvd;
+  mess (chai '<DataSet timestep="'
+             (n * dt)
+             '" file="res_' n '.vtu"/>');
+fin bpvd;
+mess '</Collection>';
+mess '</VTKFile>';
+opti sort 'sortie.txt';
+\end{verbatim}
+\end{castemlines}
+
+\noindent The last line redirects the output away again -- forget it and the
+rest of your run is written into the \texttt{.pvd} file. The alternative,
+and the one to prefer if you are already post-processing in Python, is to
+write the plain \texttt{.vtu} files from \texttt{Cast3M} and let
+\texttt{meshio} or \texttt{pyvista} assemble the series
+(chapter~\ref{chap:python}).
+
+\section{Graphics and plots}
+\label{sec:io:graphics}
+
+Graphics created with \op{trac[er]} or \op{dess[iner]} can be saved in
+\textsc{postscript} to an external file.
+\dindex{trac[er]}{save graphics} \dindex{dess[iner]}{save graphics}
+\sindex{save graphics}
+The steps are:
+
+\begin{itemize}
+\item click, in the \texttt{Cast3M} graphics window, (i) \emph{Softcopy}, then
+  (ii) one of \emph{Framemaker}, \emph{Postscript couleur} (colour) or
+  \emph{Postscript NB} (black and white);
+\item all subsequent graphic output is accumulated in a single temporary file
+  \texttt{fort.24} in the working directory. After the end of the run it is
+  copied to \texttt{.ps} if the program was started as \texttt{castem26}, or
+  to \texttt{my\_file.ps} if it was started as
+  \texttt{castem26 my\_file.dgibi}.
+\end{itemize}
+
+\noindent The mouse click matters: with this route only the views you actually
+display and click get written.
+
+\medskip
+In a batch run there is nobody to click, and the second route is the one you
+want. Setting the graphics driver with \op{opti 'TRAC'} sends every subsequent
+plot straight to the file, with no window and no interaction:
+
+\begin{codebox}
+\begin{verbatim}
+opti 'TRAC' 'PSC' ;          * colour postscript, no window
+
+trace dom (coor 1 dom);
+\end{verbatim}
+\end{codebox}
+
+\noindent The output lands in \texttt{.ps}, or in \texttt{my\_file.ps} if the
+run was started as \texttt{castem26 my\_file.dgibi}; \op{opti 'FTRA'
+'figure.ps';} names it explicitly. The driver keywords are:
+
+\begin{center}
+\begin{tabular}{@{}>{\ttfamily}l@{\hspace{6mm}}l@{}}
+'X'   & on-screen window (the default) \\
+'PS'  & grey-level \textsc{postscript} file \\
+'PSC' & colour \textsc{postscript} file \\
+'OPEN'& OpenGL window \\
+\end{tabular}
+\end{center}
+
+\noindent with the full list in the notice of \op{opti}. \op{opti 'TRAC' 'X';}
+switches back to the screen.
+
+\subsection*{How to read postscript files}
+
+\textsc{postscript} is a programming language specialised in describing
+graphical information, created by \textsc{Adobe}. It is vector-based: the
+picture is built from commands rather than from pixels, which is why a
+\texttt{Cast3M} figure can be enlarged without degrading, and why its text
+stays selectable. Several programs read it:
+
+\begin{itemize}
+\item the classical drawing and image-processing packages:
+  \textsc{Adobe Illustrator}, \textsc{Adobe Photoshop}, \textsc{Corel Draw},
+  \textsc{Inkscape} (free), \textsc{Gimp} (free), \textsc{ImageMagick} (free);
+\item the \textsc{ghostscript} family, which is what most viewers use
+  underneath. \texttt{ps2pdf} from that family is the quickest way to get a
+  figure into a \LaTeX{} document.
+\end{itemize}
+
+\noindent For a figure destined for a report, \texttt{ps2pdf figure.ps} and
+then \verb|\includegraphics{figure.pdf}| is the whole workflow.
+
+\subsection*{Changing the grey levels in saved graphics}
+
+\textsc{postscript} is a vector language and the files are plain text, so the
+grey levels of a saved figure can be edited afterwards. In the header of a
+\texttt{Cast3M} figure the definitions look like this:
+
+\begin{castemcom}
+The grey levels are defined by their names \op{/eA}, \op{/eB}, \ldots\ and
+the associated values \op{1.0000}, \op{0.9841}, \ldots\ respectively.
+\op{def} ends the definition. \dindex{trac[er]}{grey levels}
+
+To change the grey scale of a figure, edit these values; the only restriction
+is to stay in the $[0,1]$ interval. A global search and replace is usually
+enough to turn an unreadable dark figure into a printable one.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+/eA { 1.0000 setgray } def
+/eB { 0.9841 setgray } def
+...
+/e& { 0.0159 setgray } def
+/e@ { 0.0    setgray } def
+\end{verbatim}
+\end{castemlines}
+
+\section{Reading and writing data}
+
+\subsection{\texttt{acqu[erir]}: reading data from a file}
+
+The standard operator for getting data from a file is \op{acqu[erir]}
+\dindex{acqu[erir]}{get data from a file} (fr. \emph{acquérir}, to get). We
+illustrate it on a file of measurements.
+
+\begin{castemcom}
+The file \texttt{mesures.dat} contains measurements in four columns of real
+numbers over 786 lines. Under Linux its structure can be inspected with
+\texttt{head}, and \texttt{wc} counts lines, words and characters.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+$ head mesures.dat
+0.    25.58    24.8297   0.7503
+0.1   42.4199  24.9874  17.4325
+0.2  125.599   24.998  100.601
+...
+$ wc mesures.dat
+    786    3136   27653 mesures.dat
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+To read it, the \op{opti acquerir} option is set to the file name, and four
+lists are initialised with \op{prog[ramer]}.
+
+The values are then read line by line with \op{acquerir} inside a
+\op{repe[ter]} loop. The type of each item is declared with the
+\op{*flottant} suffix, and each list grows by appending with \op{et}.
+
+After reading, the lists are assembled into \op{evolution} objects, which can
+be displayed with \op{dess[iner]} or interpolated with \op{ipol} -- this is
+how a measured material law enters a computation.
+\dindex{repe[ter]}{do, start}
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti acqu 'mesures.dat';
+
+mes_t    = prog;
+mes_text = prog;
+mes_tint = prog;
+mes_del  = prog;
+
+repeter myloop 786;
+  acqu t*flottant text*flottant
+       tint*flottant delta*flottant;
+
+  mes_t    = mes_t    et (prog t);
+  mes_text = mes_text et (prog text);
+  mes_tint = mes_tint et (prog tint);
+  mes_del  = mes_del  et (prog delta);
+fin myloop;
+
+ev_text  = evol manu 'temps' mes_t
+                 't_ext' mes_text;
+ev_tint  = evol manu 'temps' mes_t
+                 't_int' mes_tint;
+ev_delta = evol manu 'temps' mes_t
+                 'delta_t' mes_del;
+
+dess (ev_text et ev_tint);
+\end{verbatim}
+\end{castemlines}
+
+\noindent The alternative, when the file is a clean table, is
+\op{lire 'CSV'}, which reads the whole file in one call with options
+\texttt{'DEBU'}, \texttt{'FIN'} and \texttt{'SEPA'} for the first line, last
+line and separator. It is shorter than the loop above and should be preferred
+for new work.
+
+\subsection{The \texttt{@excel1} procedure: writing to a file}
+
+The \op{@excel1} procedure is a user-defined subroutine which saves an
+\op{evolution} object in a format readable by a spreadsheet. It was written
+in January 1994 by Christian Laborderie (LMT, ENS Cachan) and given to the
+\texttt{Cast3M} community.
+We analyse it here because it is a good model for any output procedure of
+your own -- and because the way it redirects the standard output is the
+general mechanism for writing anything to a file from \textsc{gibiane}.
+
+\begin{castemcom}
+The complete \textsc{gibiane} structure of a procedure is printed with
+\op{list}, which numbers the lines and shows the header \texttt{Cast3M}
+stores with it -- name, type, author initials and date.
+
+The procedure is delimited by \op{debp[rocedure]}
+\dindex{debp[rocedure]}{subroutine, start} and \op{finproc}. Its input
+variables are \op{ev1}, an \op{evolution}, and \op{ficout}, the name of the
+output file given as a string (fr. \emph{mot}); the \op{*TYPE} suffix
+declares the expected type of each argument.
+
+The two lists of \op{ev1} are extracted with \op{extr[aire]}
+\dindex{extr[aire]}{extract from an evolution} and the options
+\op{absc[isse]} and \op{ordo[nnee]}.
+
+The current standard output is saved in \op{ii} with \op{vale[ur]}, the
+output is redirected to \op{ficout} with \op{opti impr}, the loop prints
+pairs of values with \op{mess[age]} \dindex{mess[age]}{print to the standard output}, and the standard
+output is finally restored to \op{ii}. Forgetting that last line is the
+classic bug: everything the program prints afterwards disappears into your
+data file.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+list @excel1;
+
+DEBPROC @EXCEL1 EV1*EVOLUTION
+                FICOUT*MOT;
+  PROG1 = EXTR EV1 ABSC;
+  PROG2 = EXTR EV1 ORDO;
+  NB = DIME PROG1;
+  I  = 0;
+  ii = VALE IMPR;
+  OPTI IMPR 10 IMPR FICOUT;
+  REPETER BOU1 NB;
+    I  = I + 1;
+    X1 = EXTR PROG1 I;
+    Y1 = EXTR PROG2 I;
+    MESSAGE X1 ';' Y1 ;
+  FIN BOU1;
+  OPTI IMPR II;
+FINPROC;
+\end{verbatim}
+\end{castemlines}
+
+\noindent This procedure writes a semicolon-separated file of two columns.
+It is perfectly serviceable, but a modern workflow exports once and does the
+analysis in Python -- which is the subject of chapter~\ref{chap:python}.
+
+\subsection{\texttt{mess[age]} and \texttt{chai[ne]}}
+
+Both of the procedures above print with \op{mess[age]}
+\dindex{mess[age]}{print to the standard output}, which writes its arguments
+to the current standard output. It accepts numbers and strings in any mixture,
+so the quickest way to trace a computation is simply
+
+\begin{codebox}
+\begin{verbatim}
+mess 'step ' n ' residual ' no_res;
+\end{verbatim}
+\end{codebox}
+
+\noindent When you need control over the \emph{format} -- a fixed number of
+decimals, a value glued into a file name -- convert the number to a string
+first with \op{chai[ne]} \dindex{chai[ne]}{convert a value to a string}, which
+is also how the CSV writer of chapter~\ref{chap:python} assembles its lines:
+
+\begin{codebox}
+\begin{verbatim}
+nom = chai 'resultat_' n '.dat';     * build a file name
+opti sauv nom;
+
+lig = chai x1 ';' y1;                * build one CSV line
+mess lig;
+\end{verbatim}
+\end{codebox}
+
+\noindent \op{chai} is what lets a loop write a different file at every step,
+which is the basis of any parametric study driven from inside
+\textsc{gibiane}.
+
+\section{\texttt{util}: loading your own procedures}
+\sindex{util[isateur]}
+
+For convenience a set of procedures can be grouped in an external file. Once
+that file is loaded, the procedures appear in subsequent runs as if they were
+built-in \texttt{Cast3M} commands.
+
+\begin{castemcom}
+The file is a plain list of programming lines in which each procedure is
+preceded by a line containing \op{\$\$\$\$} followed by the name of the
+procedure. The last line of the file contains \op{\$\$\$\$} alone.
+\dindex{debp[rocedure]}{procedure file}
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+$$$$ MYFIRST
+debproc MYFIRST ...;
+*
+finproc;
+
+$$$$ MYSECOND
+debproc MYSECOND ... ;
+finproc;
+
+$$$$
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Historically the file was loaded with the \op{util} directive in a special
+run that did nothing else, producing a \texttt{UTILPROC} file in the working
+directory that later runs picked up.
+
+\medskip
+\textbf{This is no longer the recommended way.} Current versions read
+procedures directly from the directories named by the
+\texttt{CASTEM\_PROCEDUR26} environment variable, searching the current
+directory first, then \texttt{./procedur}, then the installation. The
+\op{util} directive is deprecated.
+
+In practice: put your procedures in a \texttt{procedur} subdirectory next to
+your \texttt{.dgibi} file, one file per procedure, and they will be found.
+Dropping a file there with the name of a standard procedure also overrides
+it, which is the supported way to patch one.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* -- the old way (deprecated) --
+util proc 'my_procedures.dgibi';
+fin;
+
+* -- the current way --
+*   ./procedur/myfirst.procedur
+*   ./procedur/mysecond.procedur
+*   and just call them:
+myresult = MYFIRST arg1 arg2;
+\end{verbatim}
+\end{castemlines}
+
+\section{Calling an exterior program}
+
+\op{exte[rieur]} \dindex{exte[rieur]}{call an exterior program} runs an
+external program from inside a \texttt{Cast3M} session, and
+\op{chau[ssette]} \dindex{chau[ssette]}{dynamic link with another program}
+(fr. \emph{chaussette}, socket) opens a socket to another running program,
+which is the mechanism used for co-simulation and coupled multiphysics.
+
+The common use of \op{exte} is to hand a file to a script and read the result
+back -- for instance to call the Python post-processing of
+chapter~\ref{chap:python} at the end of a run, or to drive a parametric study
+from outside.
+
+\section*{Summary}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+
+For \texttt{Cast3M}-to-\texttt{Cast3M} transfers use \op{sauv} and
+\op{rest}: they are lossless, fast and keep the object names, and they are
+what lets you split a study into a meshing file, a computation file and a
+post-processing file.
+
+For everything else the two operators are \op{lire} and \op{sort[ir]}, and
+their format lists are not symmetric. Coming in from another mesher, MED is
+the route to prefer -- it is bidirectional, actively maintained, and it keeps
+the group names that become your named boundaries. Going out to a
+visualisation tool, \op{sort 'VTK'} and \textsc{Paraview} will do more than
+the built-in window ever can. Whatever the route, plot the imported mesh and
+check its area before computing on it.
+
+\section*{Exercises}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+
+\begin{enumerate}
+\item \textbf{Round trip.} Mesh the plate with the hole in \textsc{gmsh},
+  import it through MED, run the elastic computation, export the result with
+  \op{sort 'VTK'} and display the von Mises stress in \textsc{Paraview}.
+  Compare the stress concentration with the one obtained on the mesh built
+  in chapter~\ref{chap:meshing}.
+
+\item \textbf{Mesh sensitivity across meshers.} Generate the same geometry
+  with triangles in \textsc{gmsh} and with quadrangles in \texttt{Cast3M}, at
+  comparable numbers of degrees of freedom, and compare the maximum stress.
+  Which element type is more accurate here, and why?
+
+\item \textbf{Your own output procedure.} Write a procedure
+  \op{@exportcsv} which takes a \op{table} of \op{evolution} objects and
+  writes them as a single CSV file with one column per evolution and a header
+  line. Use it on the time history of the first exercise of
+  chapter~\ref{chap:heat}.
+\end{enumerate}

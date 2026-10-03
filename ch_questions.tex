@@ -1,0 +1,138 @@
+\chapter{\textbf{How to, and other questions}}
+\label{chap:questions}
+
+This last chapter is a troubleshooting list. It collects the errors that
+students actually hit in the first weeks, in roughly the order in which they
+hit them. When something goes wrong, look here before rerunning the
+computation with different numbers.
+
+\section*{The program will not start}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} The program will not start}
+
+\begin{description}[style=unboxed,leftmargin=0pt]
+
+\item[\texttt{castem: command not found}] The executable carries the version
+  number: it is \texttt{castem26}, not \texttt{castem}. Check which version
+  you installed, and note that a script written for an earlier release will
+  call \texttt{castem22} or \texttt{castem19}.
+
+\item[The program starts and immediately exits] There is probably a
+  \op{fin;} somewhere in the file, or the file ends in the middle of a
+  statement. Remember that a statement is terminated by \texttt{;}, not by a
+  newline, so a missing semicolon makes the reader swallow the following
+  lines.
+
+\end{description}
+
+\section*{The file will not read}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} The file will not read}
+
+\begin{description}[style=unboxed,leftmargin=0pt]
+
+\item[Errors on a line that looks perfectly correct] Look for a tab
+  character. Tabs, and the invisible characters some editors insert, break
+  the reader. Configure your editor to insert spaces (see
+  section~\ref{sec:intro:editing}) and to show whitespace.
+
+\item[Everything after a certain line is ignored] A statement may span
+  several lines but not more than 500 characters in total. Check that you
+  have not lost a \texttt{;}.
+
+\item[\texttt{OPERATEUR INCONNU}] Either a genuine typo, or an object whose
+  name shadows an operator. Object names must not have the same first four
+  characters as an operator: calling a variable \texttt{sigma} destroys
+  \op{sigm[a]} for the rest of the session. Restart the program after such a
+  mistake -- the damage persists in the session.
+
+\end{description}
+
+\section*{The computation runs but the result is wrong}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} The result is wrong}
+
+\begin{description}[style=unboxed,leftmargin=0pt]
+
+\item[Results off by a factor that looks arbitrary] Operator precedence.
+  \textsc{gibiane} evaluates strictly left to right, so
+  \op{a + b * c} is \op{(a + b) * c}. Bracket every algebraic expression.
+  This is the most common cause of a result that is wrong but not absurd.
+
+\item[Displacements are enormous, or the solver fails] The structure is not
+  properly restrained -- a rigid body motion is left free. Count your
+  conditions: in 2D you need to block three degrees of freedom at least.
+
+\item[Stresses look right in the middle and wrong at the boundary] The mesh
+  is too coarse near a stress concentration, or you are reading values at
+  nodes that were extrapolated from the Gauss points. Compare with
+  \op{chan 'CHPO'} values and refine.
+
+\item[Nothing changes when I refine the mesh] Check that the parameter you
+  changed is actually used by every meshing command. In an early version of
+  this very booklet, three of the seven lines of the plate were meshed with a
+  variable that was never defined.
+
+\item[A field operation gives an empty or zero result] Two fields can only be
+  combined component by component, by name. \texttt{'UX'} times
+  \texttt{'SCAL'} is empty, not a product. Rename with \op{exco} first.
+
+\item[\texttt{trace} complains or draws nothing] A \op{chpoint} is plotted
+  with the \emph{mesh}, a \op{mchaml} with the \emph{model}. Getting this
+  backwards is the usual cause.
+
+\end{description}
+
+\section*{Memory, size and speed}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Memory, size and speed}
+
+\begin{description}[style=unboxed,leftmargin=0pt]
+
+\item[\texttt{PAS ASSEZ DE PLACE EN MEMOIRE}] Increase the
+  \texttt{ESOPE\_PARAM} environment variable, but stay below physical RAM.
+  See section~\ref{sec:intro:install}.
+
+\item[The run is very slow] Check that the stiffness matrix is assembled and
+  factorised \emph{outside} any loop that does not change it. For large
+  three-dimensional models, enable parallelism with \op{opti 'PARA' VRAI;}
+  and \op{opti 'ASSI' n;}.
+
+\item[Two runs interfere with each other] \texttt{Cast3M} writes
+  \texttt{fort.3} and \texttt{fort.98} in the working directory. Run each
+  case in its own directory.
+
+\end{description}
+
+\section*{How to save a standard display}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} How to save a display}
+
+In the graphics window, click \emph{Softcopy} and then one of the
+\textsc{postscript} formats; the figures accumulate in \texttt{fort.24} and
+are copied to a \texttt{.ps} file when the run ends. To do the same without
+touching the window -- which is what you want in a batch run -- use
+\op{opti trac 'PS';} and \op{opti ftra 'figure.ps';}, and
+\op{opti trac 'X';} to switch back to the screen. See
+section~\ref{sec:io:graphics} for the details, including how to change the
+grey levels afterwards.
+
+For anything you intend to put in a report, consider exporting to
+\textsc{Paraview} with \op{sort 'VTK'} or plotting in Python instead
+(chapter~\ref{chap:python}): both give vector output and far better control.
+
+\section*{Where to get help}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Where to get help}
+
+In order:
+
+\begin{enumerate}
+\item \op{info \textit{operator};} in the program, or the notice of that
+  operator on the website -- the authoritative description of what the
+  arguments mean;
+\item the \textbf{Exemples} page of the website: roughly 1\,600 searchable
+  example files, and usually the fastest way to see an operator used in
+  anger;
+\item the \texttt{dgibi} directory of your own installation, which holds the
+  test cases;
+\item the user mailing list \texttt{cast3m-util@\allowbreak umontpellier.fr},
+  where questions get answered;
+\item \texttt{support-cast3m@cea.fr} for problems with the code itself.
+\end{enumerate}
+
+\noindent The URLs are collected in section~\ref{sec:intro:website}.

@@ -1,0 +1,406 @@
+\chapter{\textbf{Parabolic and hyperbolic problems: transient analysis}}
+\label{chap:heat}
+
+\section*{Outline}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+
+This chapter adds time. We take the heat conduction equations in the
+transient regime and study the heating of the plate with a hole, then do the
+same for elastodynamics with the Newmark algorithm.
+
+Both problems could be handed to the \op{pasapas} operator, which is what you
+would do in production and what chapter~\ref{chap:plasticity} describes. We
+program the time loop explicitly here instead, because writing the algorithm
+out in \textsc{gibiane} is the quickest way to understand what \op{pasapas}
+does for you -- and because the same loop structure is what you will reuse
+for any algorithm of your own.
+
+\section{Transient heat transfer}
+
+\noindent This section continues the thermal problem of
+section~\ref{sec:elas:thermal}: the model \op{mod}, the material \op{mat}
+and the blocked boundary \op{Ad23} are the ones built there, so run that
+section first (or restore its objects with \op{rest}).
+
+
+Recall that the family of algorithms presented in the lecture notes rests on
+the equation
+
+\begin{equation}
+\left[\frac{1}{\Delta t}M + \theta K\right] T_{n+1}
+=
+\left[\frac{1}{\Delta t}M - (1-\theta) K\right] T_{n}
++ \theta F_{n+1} + (1-\theta) F_{n}
+\label{eq:heat:theta}
+\end{equation}
+
+\cindex{transient analysis}\cindex{time integration}%
+\cindex[theta-method]{$\theta$-method}\cindex{Crank--Nicolson scheme}%
+\cindex{implicit scheme}\cindex{explicit scheme}\cindex{stability, unconditional}%
+\noindent which determines $T_{n+1}$ knowing $T_{n}$. Here $M$ is the
+capacity matrix, $K$ the conductivity matrix, and $\theta\in[0,1]$ is a
+parameter: $\theta=0$ gives the explicit Euler scheme, $\theta=1$ the implicit
+one, $\theta=1/2$ the Crank--Nicolson scheme, which is second-order accurate.
+Only $\theta\geq1/2$ is unconditionally stable.
+
+\begin{castemcom}
+We start by fixing the time step and the algorithm parameter. The choice
+$\theta=1$ gives an implicit and therefore unconditionally stable algorithm --
+the safe default while you are debugging.
+
+Note that with $\theta=1$ there is no restriction on $\Delta t$ for stability,
+but there very much is one for accuracy: the solution will be smooth and
+wrong rather than oscillatory and wrong.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+dt    = 0.1;
+theta = 1.;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+\sindex{table, as a history container}\cindex{time step}%
+The conductivity and capacity matrices are built first. Both are objects of
+\op{rigidite} type, which is why they can be combined with \op{et} and
+multiplied by scalars exactly like stiffness matrices.
+
+The two matrices of the algorithm follow directly from
+\eqref{eq:heat:theta}. They are assembled once, outside the loop -- this is
+the whole point of a constant time step, since \op{Matnpun} is the only
+matrix that has to be factorised.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+KK = cond mod mat;
+MM = capa mod mat;
+
+Matnpun = ((1./dt) * MM)
+          et (theta * KK);
+Matn    = ((1./dt) * MM)
+          et ((theta - 1.) * KK);
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The matrix $A$ corresponding to the temperature imposed on the exterior
+boundary is built as in the steady case, and the maximum exterior temperature
+\op{Td} is fixed.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+Td = 1.;
+
+Ad23 = bloq 'T' d23;
+AA   = Ad23;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The tables of temperature fields and of imposed temperatures are initialised.
+A \op{table} indexed by the step number is the natural \textsc{gibiane}
+container for a history: \op{T . n} is the field at step $n$, and the whole
+history stays available for post-processing after the loop.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+T = table;
+T . 0 = manu 'CHPO' dom 1 'T' 0.;
+
+F = table;
+F . 0 = depi Ad23 0.;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The computation is then the resolution of \eqref{eq:heat:theta} at each time
+step.
+
+Two points of \textsc{gibiane} syntax are worth noting. \op{\&boucle} is the
+iterator of the loop named \op{boucle}, and it runs from 1, which is why
+\sindex{\&, loop iterator}%
+\op{n} is defined as \op{\&boucle - 1} so that the indices match the tables
+starting at 0. And the index of a table may be any expression, provided it is
+bracketed: \op{F . (n + 1)}.
+
+Here the imposed boundary temperature ramps linearly from 0 to \op{Td} over
+the \op{ndt} steps.
+
+Note the two different combinations in the right-hand side: \op{+} adds two
+nodal fields defined on the same degrees of freedom, whereas \op{et}
+\emph{concatenates} contributions living on different ones -- here the
+volume term and the Lagrange-multiplier term of the blocked boundary. They
+are not interchangeable.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+ndt = 20;
+
+repeter boucle ndt;
+  n = &boucle - 1;
+
+  F . (n + 1) = depi Ad23
+                ((n + 1) * Td / ndt);
+
+  Fn = (theta * (F . (n + 1))) +
+       ((1. - theta) * (F . n));
+
+  T . (n + 1) = reso (Matnpun et AA)
+                ((Matn * (T . n)) et Fn);
+fin boucle;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+After the loop the history is in the table, and any point value can be
+followed in time by extracting it step by step into a \op{listreel} and
+building an \op{evolution}.
+
+\op{extr} with a point as last argument takes the value of a nodal field at
+that point. This is the idiom you will use over and over for time histories.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+tt   = prog;
+thi  = prog;
+pA   = dom poin proc (0.5 0.5);
+
+repeter post (ndt + 1);
+  n = &post - 1;
+  tt  = tt  et (prog (n * dt));
+  thi = thi et
+     (prog (extr (T . n) 'T' pA));
+fin post;
+
+dess (evol manu 'time' tt
+               'T' thi);
+\end{verbatim}
+\end{castemlines}
+
+\section{Example in dynamic analysis}
+
+\cindex{dynamics, elastic}\cindex{Newmark algorithm}%
+\cindex{average acceleration scheme}\sindex{dyne}%
+\cindex{modal projection}\cindex{wave propagation}%
+As an example of dynamic analysis we take the equations of linear elasticity
+in the dynamic regime and program the Newmark algorithm in \textsc{gibiane}.
+
+As for the transient thermal problem, this type of problem can be solved with
+the \op{pasapas} operator. A variant based on the projection of the
+displacement field on a modal basis is available through the \op{dyne}
+operator, which is far cheaper when many time steps are needed and the
+response is dominated by a few modes.
+
+The Newmark family rests on the prediction/correction pair
+
+\begin{align}
+\tilde{U}_{n+1} &= U_{n} + \Delta t\,\dot{U}_{n}
+   + \tfrac{1}{2}\Delta t^{2}(1-2\beta)\,\ddot{U}_{n} \\
+\dot{\tilde{U}}_{n+1} &= \dot{U}_{n} + \Delta t (1-\gamma)\,\ddot{U}_{n}
+\end{align}
+
+\noindent followed by the resolution of
+$\left[M+\beta\Delta t^{2}K\right]\ddot{U}_{n+1}
+ = F_{n+1}-K\tilde{U}_{n+1}$
+and the update
+$U_{n+1}=\tilde{U}_{n+1}+\beta\Delta t^{2}\ddot{U}_{n+1}$,
+$\dot{U}_{n+1}=\dot{\tilde{U}}_{n+1}+\gamma\Delta t\,\ddot{U}_{n+1}$.
+
+\begin{castemcom}
+A bar of length \op{ldom} and height \op{hdom} is built starting from the line
+defining its left boundary, \op{dgauche}, and generating the mesh with
+\op{tran[slation]}. The right boundary is recovered as face 3 of the
+generated surface.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* beware: this redefines ldom, which
+* chapter 3 also uses
+ldom = 50.; hdom = 1.;
+p1 = 0. 0.; p2 = 0. hdom;
+
+nlelem = 100; nhelem = 2;
+
+dgauche = droi nhelem p1 p2;
+dom     = dgauche tran nlelem
+                  (ldom 0.);
+ddroite = dom face 3;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The model and the material follow. Note that \texttt{'RHO'} is compulsory
+here: without a density there is no mass matrix and no dynamics.
+
+With $E=1$, $\rho=1$ the wave speed is $c=\sqrt{E/\rho}=1$, so a wave crosses
+the 50-unit bar in 50 time units -- convenient for checking the results
+against the analytical solution.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+mod = dom mode mecanique
+          elastique isotrope;
+mat = mod mate 'RHO' 1.
+               'YOUN' 1. 'NU' 0.3;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The parameters of the computation: the time step \op{dt} and the algorithm
+parameters $\beta$ and $\gamma$.
+
+The values $\beta=1/4$, $\gamma=1/2$ give the average acceleration scheme,
+which is implicit, second-order accurate, unconditionally stable and
+conserves energy. They are the standard choice and the one to use unless you
+have a reason not to.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+ndt   = 200;
+dt    = 1.;
+beta  = 0.25;
+gamma = 0.5;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The boundary conditions: the left end of the bar is clamped, and a rectangular
+pulse of force is applied at the right end during the first few instants.
+
+Building the load as a table indexed by step number, as here, keeps the time
+dependence explicit and readable. Note that the table must be filled for \emph{every} step the time loop will
+read: a missing entry raises an error rather than returning zero. That is why
+the loop opposite fills all \op{ndt}$+1$ entries, setting the two steps of
+the pulse to \op{fimp} and all the others to zero.
+
+\dindex{char[gement]}{loading history}%
+For a long history it is more convenient to define an \op{evolution} and use
+\op{char[gement]}, as in chapter~\ref{chap:plasticity}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+AA = bloq 'DEPL' dgauche;
+
+f0   = forc ddroite (0. 0.);
+fimp = forc ddroite (-1. 0.);
+
+F = table;
+repeter bload (ndt + 1);
+  k = &bload - 1;
+  si ((k ega 1) ou (k ega 2));
+    F . k = fimp;
+  sino;
+    F . k = f0;
+  finsi;
+fin bload;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The stiffness matrix $[K]$ and the mass matrix $[M]$ are assembled, and from
+them the matrix $[S]=[M]+\beta\Delta t^{2}[K]$ -- the only one that will be
+inverted during the algorithm, and the reason the implicit Newmark scheme
+costs one factorisation rather than one per step.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+KK = rigi mod mat;
+MM = mass mod mat;
+
+SS = MM et
+     ((beta * (dt ** 2.)) * KK);
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Displacements $[U]$, velocities $[\dot{U}]$ and accelerations $[\ddot{U}]$ are
+initialised. The initial acceleration is not chosen freely: it is obtained
+from the equation of motion at $t=0$, i.e. by solving
+$M\ddot{U}_0 = F_0 - K U_0$, which here reduces to $M\ddot{U}_0 = F_0$ since
+$U_0=0$.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+U   = table;
+dU  = table;
+ddU = table;
+
+U  . 0 = manu 'CHPO' dom 2
+              'UX' 0. 'UY' 0.;
+dU . 0 = manu 'CHPO' dom 2
+              'UX' 0. 'UY' 0.;
+
+ddU . 0 = reso (MM et AA) (F . 0);
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+And finally the time increment loop, in three stages: prediction, computation
+of the acceleration, correction and update.
+
+The three stages are written out so that the structure of the Newmark scheme
+stays visible; in production \op{pasapas} does the same thing.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+repeter boucle ndt;
+  n = &boucle - 1;
+
+* ** prediction
+  Upred  = (U . n)
+    + (dt * (dU . n))
+    + ((0.5 * dt * dt
+        * (1. - (2.*beta))) * (ddU . n));
+  dUpred = (dU . n)
+    + ((dt * (1. - gamma)) * (ddU . n));
+
+* ** acceleration
+  ddU . (n + 1) = reso (SS et AA)
+    ((F . (n+1)) - (KK * Upred));
+
+* ** correction and update
+  U  . (n + 1) = Upred
+    + ((dt * dt * beta) * (ddU . (n+1)));
+  dU . (n + 1) = dUpred
+    + ((dt * gamma) * (ddU . (n+1)));
+fin boucle;
+\end{verbatim}
+\end{castemlines}
+
+\section*{Summary}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+
+Adding time to a problem does not change the operators, only what you do with
+them. Both algorithms in this chapter have the same shape: assemble the
+constant matrices once outside the loop, keep the history in a \op{table}
+indexed by step number, and solve one linear system per step. The only
+matrix that is factorised is the one multiplying the unknown at $n+1$, which
+is why a constant time step is worth having.
+
+The two parameters that decide whether the result means anything are the
+scheme parameters -- $\theta$ for the heat equation, $(\beta,\gamma)$ for
+Newmark -- and the time step. $\theta\ge1/2$ and $\gamma=1/2$, $\beta=1/4$
+are unconditionally stable and are the defaults to use until you have a
+reason not to; stability, however, is not accuracy, and an over-large step
+gives a smooth, plausible and wrong answer.
+
+\section*{Exercises}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+
+\begin{enumerate}
+\item \textbf{Stability of the $\theta$-scheme.} Rerun the transient thermal
+  computation with $\theta=0$ (explicit Euler) and increase $\Delta t$ until
+  the solution oscillates. Compare the critical step with the theoretical
+  stability limit. Then repeat with $\theta=1/2$ and $\theta=1$ and verify
+  that no such limit exists.
+
+\item \textbf{Energy conservation in Newmark.} For the bar with no applied
+  load after the initial pulse, compute at each step the kinetic energy
+  $\tfrac12 \dot{U}^{T}M\dot{U}$ and the elastic energy
+  $\tfrac12 U^{T}KU$, and plot their sum. Verify that it is conserved for
+  $\gamma=1/2$ and dissipated for $\gamma>1/2$.
+
+\item \textbf{Wave propagation.} Plot the displacement of the free end of the
+  bar against time and identify the round-trip travel time of the wave.
+  Compare with $2L/c$.
+\end{enumerate}

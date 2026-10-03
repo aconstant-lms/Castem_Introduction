@@ -1,0 +1,61 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile the booklet
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: castem.tex
+          latexmk_shell_escape: false
+          args: -pdf -interaction=nonstopmode -file-line-error
+
+      # latexmk returns 0 on an undefined reference or an overfull box, so the
+      # quality gate has to read the log itself.  Keep this strict: every one
+      # of these was zero when the chapter was written, and a new one means
+      # something regressed.
+      - name: Check the log
+        run: |
+          fail=0
+          undef=$(grep -c 'undefined' castem.log || true)
+          over=$(grep -c '^Overfull' castem.log || true)
+          idxerr=0
+          [ -f castem.ilg ] && idxerr=$(grep -c 'Input index error' castem.ilg || true)
+
+          echo "undefined references/citations : $undef"
+          echo "overfull boxes                 : $over"
+          echo "makeindex errors               : $idxerr"
+
+          [ "$undef"  -eq 0 ] || { echo "::error::undefined references"; fail=1; }
+          [ "$over"   -eq 0 ] || { echo "::error::overfull boxes"; fail=1; }
+          [ "$idxerr" -eq 0 ] || { echo "::error::makeindex rejected entries"; fail=1; }
+
+          grep -n 'undefined\|^Overfull' castem.log | head -40 || true
+          exit $fail
+
+      - name: Page count
+        run: pdfinfo castem.pdf | grep Pages || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: castem-pdf
+          path: castem.pdf
+          if-no-files-found: error
+
+      # A tagged commit also publishes the PDF as a release asset, so the
+      # "latest PDF" link you give students never goes stale.
+      - name: Attach the PDF to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: castem.pdf

@@ -1,0 +1,1189 @@
+\chapter{\textbf{Elliptic problems: elasticity and heat transfer}}
+\label{chap:elasticity}
+
+\section*{Outline}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+
+This chapter sets up and solves the two model elliptic problems: linear
+elastic equilibrium and thermal equilibrium. The two are treated together
+because in \texttt{Cast3M} they are literally the same sequence of operators
+with different keywords -- build a model, attach a material, assemble a
+matrix, impose boundary conditions, solve, post-process. Once you have the
+elastic chain in your fingers the thermal one costs five minutes.
+
+We continue with the plate with a hole meshed in
+chapter~\ref{chap:meshing}.
+
+\section{Variational formulation of the elastic equilibrium}
+
+\todoeq{variational formulation -- see the corresponding chapter of the
+lecture notes}
+
+\section{General settings}
+
+The construction of a finite element solution starts with the definition of
+the main modelling assumptions: dimension of the space, coordinate system,
+plane strain or plane stress, Fourier representation, and so on.
+
+\begin{castemcom}
+The dimension of the working space and the fundamental assumptions of the
+computation are chosen with the \op{opti} command. The two options shown here
+correspond to plane strain, i.e. \op{defo[rmation] plan[e]}
+\dindex{defo[rmation] plan[e]}{plane strain} in cartesian coordinates, and to
+axial symmetry, i.e. \op{axis} \dindex{axis}{axial symmetry} in cylindrical
+coordinates.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti mode defo plan;
+
+opti mode axis;
+\end{verbatim}
+\end{castemlines}
+
+\noindent The chosen spatial configuration automatically assigns the standard
+names of the components of the different fields. \textbf{You do not get to
+choose these names, and you will need them constantly} -- every \op{exco},
+every \op{bloq}, every plot refers to a component by name.
+
+\begin{itemize}
+\item \textbf{plane strain} (\op{defo[rmation] plan[e]}). Displacement fields
+  are defined in a cartesian coordinate system $(x,y,z)$ as
+  \[ \vect{u}(x,y,z)=u_{x}(x,y)\,\vect{e}_{x}+u_{y}(x,y)\,\vect{e}_{y} \]
+  and the component names are:
+
+  \begin{center}
+  \begin{tabular}{@{}l@{\hspace{10mm}}l@{}}
+    \textbf{field} & \textbf{component name}\\[1mm]
+    displacement & \texttt{UX, UY}\\
+    forces       & \texttt{FX, FY}\\
+    strain       & \texttt{EPXX, EPYY, EPXY, EPZZ}\\
+    stress       & \texttt{SMXX, SMYY, SMXY, SMZZ}\\
+  \end{tabular}
+  \end{center}
+
+  Note that \texttt{EPZZ} and \texttt{SMZZ} are present: in plane strain
+  $\varepsilon_{zz}=0$ but $\sigma_{zz}=\nu(\sigma_{xx}+\sigma_{yy})\neq0$,
+  and it is a standard mistake to forget it when computing an equivalent
+  stress by hand.
+
+\item \textbf{axial symmetry} (\op{axis}). Displacement fields are defined in
+  a cylindrical coordinate system $(r,\theta,z)$ as
+  \[ \vect{u}(r,\theta,z)=u_{r}(r,z)\,\vect{e}_{r}+u_{z}(r,z)\,\vect{e}_{z} \]
+  and the component names become:
+
+  \begin{center}
+  \begin{tabular}{@{}l@{\hspace{10mm}}l@{}}
+    \textbf{field} & \textbf{component name}\\[1mm]
+    displacement & \texttt{UR, UZ}\\
+    forces       & \texttt{FR, FZ}\\
+    strain       & \texttt{EPRR, EPZZ, EPRZ, EPTT}\\
+    stress       & \texttt{SMRR, SMZZ, SMRZ, SMTT}\\
+  \end{tabular}
+  \end{center}
+
+  Here the hoop terms \texttt{EPTT}, \texttt{SMTT} carry the
+  $\theta\theta$ component. In an axisymmetric computation the mesh must lie
+  in the half-plane $r\geq0$, with $r$ as the first coordinate.
+\end{itemize}
+
+\noindent The complete list for every modelling option is in the notice of
+\op{mode[le]} on the website~\cite{Cast3M:web}; the exact set also depends on
+the element, so check it there rather than trusting this table for an element
+type not used in this booklet.
+
+\begin{optable}{General settings}
+opti[on] dime n   & space dimension $n=1,2,3$ \\
+opti[on] mode plan defo & cartesian coordinates, plane strain \\
+opti[on] mode plan cont & cartesian coordinates, plane stress \\
+opti[on] mode axis      & cylindrical coordinates, axisymmetric \\
+opti[on] mode four[ier] n & cylindrical coordinates, Fourier expansion up to
+                            $n$ harmonics \\
+opti[on] mode trid[imensionnel] & cartesian coordinates, three-dimensional \\
+\end{optable}
+
+\section{Elasticity -- \texttt{Cast3M} problem setting}
+
+\subsection{Boundary conditions and solution method}
+
+The method of solution used by \texttt{Cast3M} is based on the Lagrangian
+relaxation of the displacement boundary conditions, as explained for example
+in~\cite{Bonnet:2007}. The variational principle
+of the preceding section transforms into
+
+\noindent which, after discretisation, leads to the linear
+system~\cite{Bonnet:2007}
+
+\begin{equation}
+\begin{bmatrix} K & A^{T} \\ A & 0 \end{bmatrix}
+\begin{bmatrix} U \\ \lambda \end{bmatrix}
+=
+\begin{bmatrix} F \\ U^{D} \end{bmatrix}
+\label{eq:elas:lagrange}
+\end{equation}
+
+\noindent in which the stiffness matrix $[K]$ is defined with respect to
+\emph{all} nodal displacements, with no distinction between values imposed by
+the boundary conditions and the others. The imposed displacements enter
+through the projection matrix $[A]$ and the imposed values $[U^{D}]$. The
+traction boundary conditions and the body forces define the vector $[F]$.
+
+The practical consequence of \eqref{eq:elas:lagrange} is the one that
+surprises newcomers: \textbf{imposing a boundary condition adds unknowns to
+the system} -- the Lagrange multipliers $\lambda$ -- rather than removing
+them. Those multipliers are the reaction tractions, which is why they can be
+recovered afterwards with \op{reac}.
+
+\begin{castemcom}
+The \op{mode[le]} \dindex{mode[le]}{model} operator associates to a given mesh
+a finite element, i.e. a specific shape function in the variational principle
+(here linear functions by default, the \texttt{QUA4} element), a mechanical
+problem setting \op{mecanique}, and a linear isotropic elastic constitutive
+law. Other problem settings are \op{thermique}, \op{liquide}, \op{darcy},
+\ldots
+
+The choice of the material behaviour determines the number and the names of
+the parameters that must be supplied next through the \op{mate[riaux]}
+\dindex{mate[riaux]}{material} operator, as well as the structure of the
+internal variables of the model.
+
+The stiffness matrix $[K]$ is then computed with \op{rigi[dite]}
+\dindex{rigi[dite]}{stiffness} from the elastic information provided before.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+mod = dom mode mecanique
+          elastique isotrope;
+
+mat = mod mate 'YOUN' 2.e11 'NU' 0.3;
+
+KK = rigi mod mat;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+To construct the projection matrices $[A]$, which reduce the displacement
+vector to the part of the boundary where $[U^{D}]$ is applied, we use
+\op{bloq[uer]} \dindex{bloq[uer]}{block a degree of freedom}. The
+corresponding right-hand side is then built from $[A]$ and $[U^{D}]$ with
+\op{depi} \dindex{depi}{imposed displacement} (fr. \emph{déplacement imposé}).
+
+Note that \op{bloq[uer]} and \op{depi} do not merely build $[A]$ and
+$[U^{D}]$: they also create the new degrees of freedom corresponding to the
+Lagrange multipliers. Mechanically these multipliers are the tractions $[T]$
+on that part of the boundary, unknown before the system is solved. You can
+see them by listing the object: \op{list Ad34;}.
+
+Here \op{d12} and \op{d41} carry the symmetry conditions of the quarter
+plate ($u_y=0$ on the lower edge, $u_x=0$ on the left edge), while the block
+on \op{d34} is the loading: the upper edge is given the imposed displacement
+$u_y=0.1$.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+Ad12 = bloq uy d12;
+Ad41 = bloq ux d41;
+Ad34 = bloq uy d34;
+
+ud34 = depi Ad34 0.1;
+
+AA = Ad12 et Ad41 et Ad34;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The system is finally solved by calling \op{reso[udre]}
+\dindex{reso[udre]}{solve}. Only the non-zero components of the right-hand
+side have to be specified -- here only \op{ud34}; the rest is completed with
+zeros automatically.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+u = reso (KK et AA) ud34;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Listing the components of the displacement field shows the expected
+\texttt{UX} and \texttt{UY}, and also a new component \texttt{LX}: the
+Lagrange multiplier, which carries $[T]$.
+
+To obtain the underlying traction vector we use \op{reac[tion]}
+\dindex{reac[tion]}{reaction forces}, which turns the multipliers back into
+nodal forces on the blocked boundary. Summing them is the standard way to get
+the resultant force on a boundary -- for instance to plot a force/displacement
+curve.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+list (extr u 'COMP');
+
+td34 = reac u Ad34;
+
+* resultant on d34
+ftot = resu (exco td34 'FY');
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Have the boundary conditions removed every rigid body motion?}
+\label{sec:elas:ense}
+
+\cindex{rigid body motion}\cindex{under-restrained structure}%
+\cindex{singular stiffness matrix}%
+Before solving anything, it is worth asking whether the blocked degrees of
+freedom actually hold the structure. A body that can still translate or
+rotate as a whole has a singular stiffness matrix, and the symptoms are
+unmistakable once you know them: the solver fails, or it returns
+displacements of absurd magnitude with a sensible-looking stress field
+superposed on them.
+
+In two dimensions a body has three rigid body motions -- two translations and
+one rotation -- and in three dimensions six. Every one of them must be
+removed by the boundary conditions. Counting them by hand on the quarter
+plate is easy; on a real assembly of several parts, with symmetry conditions
+and contact, it is not, and this is where most "the solver does not converge"
+problems actually live.
+
+\texttt{Cast3M} will answer the question directly.
+
+\begin{castemcom}
+\op{ense[mble]} \dindex{ense[mble]}{rigid body modes of a stiffness matrix}
+takes an assembled stiffness -- \emph{including its blocking matrices} -- and
+returns a \op{solution} object containing the \emph{mouvements d'ensemble},
+the rigid body modes that the matrix still permits.
+
+\medskip
+\textbf{The test is the number of modes it finds.} None means the structure
+is properly restrained and you can solve. One or more means it is not, and
+each mode it returns \emph{is} a motion your \op{bloq} conditions failed to
+suppress -- so you do not have to guess which one is missing: plot it.
+
+\op{tire} \dindex{tire[r]}{extract a mode from a solution object} pulls out
+mode number \texttt{n} as a displacement field, which is then drawn with
+\op{defo} like any mode shape.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* KK is the stiffness, AA the
+* assembled blocking matrices
+mmm = ense (KK et AA);
+
+* how many rigid modes remain?
+nrig = dime mmm;
+mess 'rigid body modes left: ' nrig;
+
+* ... and what are they?
+si (nrig > 0);
+  repeter brig nrig;
+    i  = &brig;
+    di = tire mmm 'DEPL' 'RANG' i;
+    trac (defo dom di 1. rouge);
+  fin brig;
+finsi;
+\end{verbatim}
+\end{castemlines}
+
+\noindent The complement of \op{bloq} is therefore \op{ense}: one imposes the
+conditions, the other checks that they were enough. Running it once on every
+new model costs nothing and saves a great deal of time.
+
+\medskip
+Two situations where you will want it even though nothing has gone wrong:
+
+\begin{itemize}
+\item \textbf{a free-free structure, deliberately.} A modal analysis of an
+  unrestrained body -- an aircraft, a satellite panel, a specimen hanging on
+  soft springs -- is supposed to have rigid body modes, and
+  \op{vibr[ation]} will return them as modes at (numerically) zero frequency.
+  Knowing from \op{ense} how many to expect is exactly how you tell a genuine
+  zero-frequency mode from a mesh that has fallen apart;
+\item \textbf{before a buckling computation.} \op{flambage} works on a
+  stiffness that must be non-singular, so an under-restrained model gives
+  meaningless critical loads rather than an error. Chapter~\ref{chap:eigen}
+  returns to both of these.
+\end{itemize}
+
+\noindent A related use of the word: \op{rela 'ENSE'}, in
+section~\ref{sec:elas:rela}, imposes that a component be \emph{equal} over a
+whole boundary -- a rigid platen. The two are unconnected beyond the shared
+French word \emph{ensemble}, "as a whole".
+
+\medskip
+\noindent\textbf{A note on the name.} The operator is \op{ense[mble]}, not
+\op{enve}. \op{enve[loppe]} is the meshing operator of
+section~\ref{sec:mesh:3d} that extracts the boundary surface of a volume
+(and, in a second form, the envelope of a set of oscillator spectra). The two
+are easy to confuse from memory and do entirely different things.
+
+\begin{optable}{Plots}
+trac[er] & plots different objects \\
+trac[er] model field & plots a field defined on elements \\
+trac[er] geometry field & plots a field defined at nodes \\
+trac[er] geometry & plots a mesh \\
+dess[iner] evolution & plots the graph of a function \\
+evol[ution] & graph of a function defined by lists of numbers \\
+evol[ution] 'CHPO' \ldots & extracts the evolution of a field along a path \\
+\end{optable}
+
+\noindent The results can be post-processed in a number of ways, as shown in
+the next examples.
+
+\begin{castemcom}
+To plot the norm of the displacement vector
+\[ \norm{u}=\sqrt{u_{x}^{2}+u_{y}^{2}} \]
+we extract the components with \op{exco} \dindex{exco}{extract a component}
+(fr. \emph{extraire composante}), combine them algebraically, and plot with
+\op{trac[er]}.
+
+The second argument of \op{exco} is the component to take, the third the name
+to give it in the result: renaming to \texttt{'SCAL'} is what lets the two
+components be multiplied together afterwards -- fields are only combined
+component by component, by name.
+
+As displacement fields are defined by their nodal values, the underlying mesh
+must be given for the plot.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+uux = exco u 'UX' 'SCAL';
+uuy = exco u 'UY' 'SCAL';
+
+trace uux dom;
+
+unorm = (((uux*uux) + (uuy*uuy))**0.5);
+trace unorm dom;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Strains and stresses are computed with \op{epsi[lon]}
+\dindex{epsi[lon]}{strain} and \op{sigm[a]} \dindex{sigm[a]}{stress}; the
+operations correspond to the matrix computations
+\begin{align}
+\varepsilon &= [B][U] \\
+\sigma      &= [C][B][U]
+\end{align}
+with $[C]$ the elasticity matrix. Note that \op{sigm} needs the material in
+addition to the model, whereas \op{epsi} does not -- strain is a purely
+kinematic quantity.
+
+Both results are \op{mchaml} objects, defined at the Gauss points. The names
+of their components can be listed with \op{extr[aire]}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+eps = epsi mod u;
+sig = sigm mod mat u;
+
+list (extr eps 'COMP');
+list (extr sig 'COMP');
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Another operator corresponds to $[B^{T}]$ and computes the nodal forces
+associated with a given stress field:
+\begin{equation}
+[F]=[B^{T}]\sigma
+\end{equation}
+which is the discrete counterpart of $\ddiv\sigma$ in a continuum
+formulation. \op{bsig[ma]} \dindex{bsig[ma]}{nodal forces from a stress field}
+
+A good sanity check on any converged solution: these nodal forces must vanish
+everywhere except at the boundary, where they equal the reactions. If they do
+not, the solution is not in equilibrium.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+f = bsigm mod sig;
+
+trace dom (exco f 'FX');
+trace dom (exco f 'FY');
+\end{verbatim}
+\end{castemlines}
+
+\begin{optable}{Strains and stresses}
+epsi[lon] & computes the strain tensor \\
+sigm[a]   & computes the stress tensor \\
+bsig[ma]  & computes the nodal forces corresponding to a stress tensor \\
+tres[ca]  & computes the Tresca norm of the stress tensor \\
+vmis[es]  & computes the von Mises norm,
+            $\sqrt{\tfrac{3}{2}\,\dev\sigma\bcddot\dev\sigma}$ \\
+prin[cipales] & computes the principal values of the stress tensor \\
+@plotpri  & plots the principal values (user-defined procedure) \\
+\end{optable}
+
+\begin{castemcom}
+To plot the components of a strain or stress tensor we apply \op{trac[er]}
+directly and adjoin the \emph{model}, not the mesh, so that the position of
+the Gauss points where the values are defined is known.
+
+This is the practical difference between a \op{chpoint} and a \op{mchaml}:
+\op{trace \textit{mesh} \textit{field}} for the first,
+\op{trace \textit{model} \textit{field}} for the second.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+trace mod sig;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+Different scalar measures derived from the stress tensor are computed
+directly: the Tresca and von Mises norms with \op{tres[ca]} and
+\op{vmis[es]} \dindex{vmis[es]}{Mises stress norm}, the principal values and
+their directions with \op{prin[cipales]}.
+
+\op{@plotpri} is a user-defined procedure which plots the principal stresses
+interactively. Procedures whose names start with \op{@} are user
+contributions rather than standard operators -- see
+chapter~\ref{chap:importexport} on how to load them.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+sigvm = vmis mod sig;
+sigtr = tres mod sig;
+sigpr = prin mod sig;
+
+@plotpri sig mod;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+It is often more informative to display the evolution of a stress component
+along a path than over the whole domain. Here we plot $\sigma_{yy}$ along the
+border of the circular hole, where the stress concentration is.
+
+We first list the components of the stress field. We then interpolate the
+$\sigma_{yy}$ component -- \texttt{'SMYY'} -- from the Gauss points to the
+nodes using \op{chan[ger]} with the \texttt{'CHPO'} option
+\dindex{chan[ger] 'CHPO'}{change a field into nodal values}: a path extraction
+needs nodal values. Finally \op{evol[ution]} with the \texttt{'CHPO'} option
+extracts the values along the path \op{(arc23 et arc34)} and \op{dess[iner]}
+draws the graph.
+\sindex{evol[ution], 'CHPO', along a path}
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+list (extr sig 'COMP');
+
+sigyy = chan 'CHPO' mod
+             (exco sig 'SMYY');
+
+ev1 = evol 'CHPO' sigyy
+           (arc23 et arc34);
+dess ev1;
+\end{verbatim}
+\end{castemlines}
+
+\noindent For the plate with a hole in tension this is the computation that
+should return the classical stress concentration factor $K_t=3$ for an
+infinite plate; comparing your value with 3 is the natural first validation of
+the whole chain, and the discrepancy tells you how much the finite width of
+the plate matters.
+
+\subsection{Other applied forces: pressure, weight, \ldots}
+
+The load in the previous example was an imposed displacement only, so the
+exterior load vector was $[F]=[0]$ and the program completed it with zeros.
+The next examples show how surface tractions and body forces are imposed.
+
+\begin{optable}{Applied forces}
+forc[e]    & distributes a given force over a set of nodes \\
+pres[sion] & computes the nodal force distribution for a given pressure \\
+coor[donnees] & computes the coordinate fields of a given mesh \\
+mass[e]    & computes the mass matrix \\
+manu 'CHPO' & constructs a nodal field by hand \\
+\end{optable}
+
+\begin{optable}{Creation of stiffness-type matrices}
+rigi[dite]     & stiffness matrix \\
+mass[e]        & mass matrix \\
+cond[uctivite] & conductivity matrix \\
+capa[cite]     & capacity matrix \\
+conv[ection]   & stiffness corresponding to a convection boundary condition \\
+\end{optable}
+
+\subsection{Surface traction and applied pressure}
+
+The main operators for constructing applied forces are \op{forc[e]}
+\sindex{forc[e]} and \op{pres[sion]} \sindex{pres[sion]}.
+
+\begin{castemcom}
+The \op{coor} \dindex{coor[donnees]}{coordinate fields} operator builds the
+coordinate fields of a mesh. Here we recover $x$ and $y$ at each point of the
+line \op{d23}.
+
+\op{pres} computes the nodal force field corresponding to the pressure
+distribution $p(x,y)=3x^{2}$. A model is needed because the computation
+integrates the pressure against the shape functions of the underlying
+elements (see~\cite{Bonnet:2007}) -- a pressure is not simply divided equally
+between nodes. Note
+that this model must be built \emph{on the loaded boundary} \op{d23}, not on
+the surface \op{dom}: it is the line elements that are integrated over. This
+is a frequent source of errors.
+
+Finally the normal pressure distribution \op{fnor} is turned into a tangential
+traction \op{ftan} by exchanging the components of the vector field and
+changing one sign, i.e. by rotating it by $90^{\circ}$.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* the model must live on the loaded
+* line, not on the surface
+mod23 = d23 mode mecanique
+            elastique isotrope;
+
+xx yy = coor d23;
+
+fnor = pres mass mod23 (3.* (xx * xx));
+
+ftan = (exco fnor 'FY' 'FX') et
+       (-1. * (exco fnor 'FX' 'FY'));
+\end{verbatim}
+\end{castemlines}
+
+\noindent To impose a Hertzian pressure distribution, for example a parabola
+centred on the left end of the loaded edge,
+\[
+p(x)=\begin{cases}
+p_{max}\,(a_{p}^{2}-x^{2}) & \text{if } \abs{x}<a_{p}\\
+0 & \text{if } \abs{x}\ge a_{p}
+\end{cases}
+\]
+we proceed in the same way, with one extra ingredient.
+
+\begin{castemcom}
+\op{manu[el]} \dindex{manu[el]}{create a field by hand} constructs a constant
+nodal field, which is what lets a constant appear in an otherwise
+field-valued formula: $a_p$ has to become a field before $a_p^2-x^2$ can be
+formed.
+
+\op{masq[uer]} \dindex{masq[uer]}{mask, characteristic function} builds the
+characteristic function of the condition
+$x<a_{p}$ -- a field equal to 1 where the condition holds and 0 elsewhere.
+Multiplying by it is how one writes a piecewise definition in
+\textsc{gibiane}; there is no \op{si} test inside a field expression. Here
+the edge runs from $x=0$, so $x<a_p$ and $\abs{x}<a_p$ select the same
+points; on an edge straddling the origin you would need the product of two
+masks, as in the inclusion example below.
+
+The final nodal force distribution is assembled by multiplying the two.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+xx = coor 1 d34;
+
+ap   = ldom / 3.;
+pmax = 1.e8;
+
+one = manu 'CHPO' d34 1 'SCAL' 1.;
+
+px  = pmax * (((ap * one) ** 2)
+              - (xx ** 2));
+
+mask = (xx masq 'INFERIEUR' ap);
+px   = px * mask;
+
+mod34 = d34 mode mecanique
+            elastique isotrope;
+fp = pres mass mod34 px;
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Body forces}
+
+\begin{castemcom}
+To build a body force taking the density of the body into account, the
+density \texttt{RHO} is added to the material and the mass matrix is computed
+with \op{mass[e]}.
+
+If the gravitational acceleration is defined as the nodal field \op{g}, the
+body force is simply the product of the mass matrix with it: $[F]=[M]\{g\}$.
+That is the discrete form of $\int_\Omega \rho\, \vect{g}\cdot\vect{v}$, and
+it is the correct way to apply gravity -- distributing the total weight
+equally over the nodes is not.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+mat = mod mate 'YOUN' 2.e11 'NU' 0.3
+               'RHO' 2000.;
+
+MM = mass mod mat;
+
+g = manu 'CHPO' dom 1 'UY' -9.81;
+
+fvol = MM * g;
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Thermal expansion}
+
+\cindex{thermal expansion}\cindex{thermoelasticity}%
+\cindex{dilatation coefficient}%
+The thermal expansion of a heated body is a loading like any other, and it is
+worth treating here because it is the commonest way a thermal computation
+feeds back into a mechanical one. It follows directly from the thermoelastic
+constitutive law
+\begin{equation}
+  \tens{\sigma} = \tens{C} : \left( \tens{\varepsilon} - \tens{a}\,\theta \right)
+\label{eq:elas:thermoelastic}
+\end{equation}
+where $\tens{C}$ and $\tens{a}$ are the fourth-order tensor of elastic moduli
+and the second-order tensor of thermal dilatation, and $\theta$ is the field of
+temperature difference between the initial and the actual configuration. In the
+elastic problem setting $\theta$ is known: it plays the role of a loading.
+
+For an isotropic material this simplifies to
+\begin{equation}
+  \tens{\sigma} = \lambda \tr (\tens{\varepsilon} - \alpha \theta \tens{I}) \tens{I}
+   + 2 \mu (\tens{\varepsilon} - \alpha \theta \tens{I})
+\end{equation}
+and, in the absence of body forces, the balance equation
+$\ddiv \tens{\sigma} = 0$ becomes
+\begin{equation}
+   \ddiv \left[ \tens{C} : \tens{\varepsilon} \right]
+   = \ddiv \left[ \tens{C} : \left( \tens{a}\,\theta \right) \right]
+\end{equation}
+
+\noindent The right-hand side is the point: a temperature field acts exactly
+like a distributed body force, generated by the incompatibility of the thermal
+expansion. That is why a uniform temperature rise on an unconstrained body
+produces no stress at all, while the same rise on a constrained or
+inhomogeneous body does.
+
+These steps map one to one onto the \textsc{gibiane} program.
+
+\begin{castemcom}
+The thermal expansion coefficient must be declared in the material data. For
+an isotropic elastic material the component name is \texttt{'ALPH'}.
+
+\medskip
+In this example the temperature field $\theta$ is \op{delta\_th}. The operator
+\op{thet[a]} \dindex{thet[a]}{thermal stress field} computes, from the
+material data and the temperature field, the thermal stress field
+\[ \op{sig\_th} = \tens{C} : \left( \alpha\,\theta\,\tens{I} \right) \]
+The equivalent body forces follow from \op{bsig[ma]}, whose role was described
+earlier in this chapter.
+
+The solution is then obtained with the standard \op{reso[udre]}, from the
+stiffness matrix \op{KK}, the matrices of the imposed displacement conditions
+\op{AA}, and the body force field \op{f\_th}.
+
+\medskip
+Note that \op{thet} measures the temperature from a reference value
+\texttt{'TALP'}, which defaults to zero: \op{delta\_th} is a temperature
+\emph{difference}, not an absolute temperature.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+mod = dom mode mecanique
+          elastique isotrope;
+mat = mod mate 'YOUN' 2.e11 'NU' 0.3
+               'ALPH' 1.e-5;
+
+* ... boundary conditions as before,
+*     giving KK and AA ...
+
+delta_th = manu 'CHPO' dom 1 'T' 1000.;
+
+sig_th = thet mod mat delta_th;
+f_th   = bsigm mod sig_th;
+
+u = reso (KK et AA) f_th;
+\end{verbatim}
+\end{castemlines}
+
+\noindent The stress actually carried by the body is \emph{not} \op{sig\_th}:
+it is the stress computed from the resulting displacement minus the thermal
+part, i.e. \op{(sigm mod mat u) - sig\_th}. Forgetting that second term is the
+classic error in a thermoelastic computation, and it shows up as a non-zero
+stress in a body that is free to expand.
+
+\subsection{Other constraints on displacements}
+\label{sec:elas:rela}
+
+Blocking a degree of freedom to a given value is not the only kind of boundary
+condition. \cindex{rigid platen}\cindex{linear constraint between unknowns}%
+A frequent requirement is that a part of the boundary stay flat or
+move as a rigid whole -- a loading platen, a symmetry condition on a surface
+that is free to translate -- i.e. that all the displacement components of the
+points of a line $\ell$ be equal to each other:
+\begin{equation}
+   \vect{u}(\vect{x}) = \text{constant}
+   \qquad \forall \vect{x} \in \ell \subset \partial \Omega
+\end{equation}
+The constant itself is left free, and is fixed afterwards -- for instance by
+imposing the displacement at one particular point of the line, as in the
+example below.
+
+\dindex{rela[tion]}{constraint on the displacement field}
+
+\begin{castemcom}
+The operator \op{rela[tion]} with the option \texttt{'ENSE'}
+(fr. \emph{ensemble}) builds a stiffness matrix -- again a set of Lagrange
+multipliers -- imposing that the \texttt{UY} component of the displacement
+field be the same at every node of the line \op{d34}.
+
+To fix the value of that unknown constant we impose the displacement at the
+single point \op{p3}. The rest is as before: assemble all the matrices and
+solve with \op{reso[udre]}.
+
+\medskip
+This is what you want for a rigid platen pressing on the plate: the surface
+stays flat, but the traction distribution under it is computed rather than
+assumed -- which is exactly the difference between this and \op{bloq}-ing the
+whole line to a fixed value.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+Ad34 = rela 'ENSE' 'UY' d34;
+
+Ap3 = bloq 'UY' p3;
+up3 = depi Ap3 0.3;
+
+AA = Ad12 et Ad41 et Ad34 et Ap3;
+
+u = reso (KK et AA) up3;
+\end{verbatim}
+\end{castemlines}
+
+\noindent \op{rela[tion]} imposes many other kinds of constraint, equalities
+and inequalities alike: rigid body motion (\texttt{'CORI'}), sliding relations
+between two meshes (\texttt{'GLIS'}), tying mid-side nodes to corner nodes
+(\texttt{'MILI'}), coupling a pipe surface to its centre line
+(\texttt{'TUYA'}), and so on. See its notice for the full list.
+
+\begin{optable}{Conditions on displacements}
+bloq[uer] & blocks a degree of freedom to an imposed value \\
+rela[tion] & stiffness matrix for a linear relation between degrees of
+             freedom \\
+rela[tion] 'ENSE' & imposes one component to be equal over a whole mesh \\
+rela[tion] 'CORI' & imposes a rigid body motion \\
+depi      & right-hand side associated with an imposed value \\
+reac[tion] & recovers the reaction associated with a constraint \\
+\end{optable}
+
+\subsection{Spatially varying material coefficients}
+
+We have seen that spatially varying boundary tractions are easily defined with
+\op{coor[donnees]} and \op{masq[uer]}. The same construction gives varying
+material parameters. The example below places a square inclusion in a plate --
+a two-material composite.
+
+\begin{castemcom}
+The example runs on its own square mesh \op{plaq} rather than on the plate
+with the hole, since an inclusion spanning $0.2\le x,y\le 0.8$ would otherwise
+overlap the hole.
+
+The characteristic field of the inclusion, \op{D\_CAR}, is built as the
+product of four masks and takes the value 1 inside the square and 0 outside;
+\op{M\_CAR} is its complement.
+
+The distributions of Young's modulus and Poisson's ratio are then
+interpolations between the two materials weighted by these two fields.
+
+The next step is the one to pay attention to. Material parameters live at the
+Gauss points of the elements, not at the nodes, so the nodal fields must be
+converted with \op{chan[ger]}
+\dindex{chan[ger] 'CHAM'}{change from nodal to element field} using the
+keywords \texttt{'CHAM'} (fr. \emph{champ}) and \texttt{'RIGIDITE'}, which
+define the intended use and the header of the new field.
+\dindex{chpo}{change from nodal to element field}%
+\dindex{mchml}{change from nodal to element field} The component name
+also has to be changed from \texttt{'SCAL'} to \texttt{'YOUN'} and
+\texttt{'NU'} with \op{nomc} \dindex{nomc}{rename a component}, because
+\op{mate} identifies its arguments by component name.
+
+Material and stiffness matrix are then created as usual, the only difference
+being that the arguments are fields rather than numbers.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* a plain square of side 1, not the
+* plate with the hole: the inclusion
+* below would overlap the hole
+opti dime 2 elem qua4;
+c1 = 0. 0.;  c2 = 1. 0.;
+c3 = 1. 1.;  c4 = 0. 1.;
+plaq = dall (droi 20 c1 c2) (droi 20 c2 c3)
+            (droi 20 c3 c4) (droi 20 c4 c1);
+
+mod = plaq mode mecanique
+           elastique isotrope;
+
+X_min = 0.2; X_max = 0.8;
+Y_min = 0.2; Y_max = 0.8;
+
+xx yy = coor plaq;
+
+D_CAR = xx masq 'SUPERIEUR' X_min;
+D_CAR = D_CAR *
+        (xx masq 'INFERIEUR' X_max);
+D_CAR = D_CAR *
+        (yy masq 'SUPERIEUR' Y_min);
+D_CAR = D_CAR *
+        (yy masq 'INFERIEUR' Y_max);
+
+one   = manu 'CHPO' plaq 1 'SCAL' 1.;
+M_CAR = one - D_CAR;
+
+* aluminium and copper
+YG_al = 69.e9;  NU_al = 0.33;
+YG_co = 117.e9; NU_co = 0.35;
+
+YG_r = (YG_co * M_CAR)
+       + (YG_al * D_CAR);
+NU_r = (NU_co * M_CAR)
+       + (NU_al * D_CAR);
+
+yg_c = chan 'CHAM'
+       (nomc 'YOUN' YG_r) mod 'RIGIDITE';
+nu_c = chan 'CHAM'
+       (nomc 'NU'  NU_r) mod 'RIGIDITE';
+
+trace mod yg_c;
+
+mat = mate mod 'YOUN' yg_c 'NU' nu_c;
+rig = rigi mod mat;
+\end{verbatim}
+\end{castemlines}
+
+\noindent Two remarks on this example. First, the moduli in the original
+version of these notes were identical for the two materials
+($33\,$GPa and $\nu=0.32$ for both aluminium and copper), so the computation
+returned a homogeneous plate; the values above are the usual ones and actually
+produce an inclusion. Second, a continuously varying distribution is obtained
+in exactly the same way, replacing the masks by any expression in \op{xx} and
+\op{yy}.
+
+\begin{optable}{Manipulation of fields}
+chan[ger] & changes the field type by interpolation \\
+manu[el]  & creates new objects \\
+nomc      & changes the name of a component \\
+exco      & extracts a component, optionally renaming it \\
+masq[uer] & characteristic function of a condition \\
+\end{optable}
+
+\section{Thermal equilibrium -- \texttt{Cast3M} problem setting}
+\label{sec:elas:thermal}
+
+The steady thermal equilibrium problem is
+\begin{equation}
+  \ddiv \left( k \, \grad \theta \right) + r = 0
+  \qquad \text{in } \Omega
+\label{eq:thermal:equilibrium}
+\end{equation}
+with $k$ the conductivity and $r$ a volume heat source, completed by imposed
+temperature, imposed flux or convection conditions on the boundary. It has
+exactly the structure of the elastic problem, and is solved by exactly the
+same sequence of operators.
+
+\begin{castemcom}
+The finite element model and the material properties are declared exactly as
+in the elastic case, with \op{mode[le]} and \op{mate[riaux]}; only the
+keywords change.
+
+The resolution of~\eqref{eq:thermal:equilibrium} depends only on the
+conductivity \texttt{K}. If the
+density \texttt{RHO} and the specific heat \texttt{C} are also given, the
+capacity matrix can be computed as well, which is what the transient
+computation of chapter~\ref{chap:heat} will need.
+
+\op{cond[uctivite]} and \op{capa[cite]} play exactly the roles that
+\op{rigi[dite]} and \op{mass[e]} play in elasticity -- same objects, same
+algebra, same solver.
+\sindex{thermique} \sindex{conductivite} \sindex{capacite}
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+mod = dom mode thermique isotrope;
+
+mat = mod mate 'K' 1. 'RHO' 1. 'C' 1.;
+
+KK = cond mod mat;
+CC = capa mod mat;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+An imposed temperature on the boundary uses the same Lagrange multiplier
+technique as in elasticity: \op{bloq[uer]} builds the projection matrix and
+\op{depi} the associated right-hand side.
+
+The name of the degree of freedom is \texttt{'T'}, which is also the name of
+the component of the temperature field.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+Ad23 = bloq 'T' d23;
+AA   = Ad23;
+
+Fd23 = depi Ad23 4.;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The nodal ``forces'' equivalent to a boundary heat flux are obtained with
+\op{flux} \dindex{flux}{boundary heat flux}. As with \op{pres}, the model is
+needed because the flux is integrated against the shape functions.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+Fd34 = flux mod 2. d34;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The convection boundary condition
+\[ -k\derp{\theta}{n}=h\,(\theta-\theta_{\infty}) \]
+is mathematically of a different type: it involves the unknown $\theta$ on the
+boundary itself. It therefore contributes \emph{both} an extra conductivity
+matrix \op{KK\_hol}, defined by the exchange coefficient $h$, \emph{and} a
+nodal flux \op{Fhole} defined by $h$ and the environment temperature
+$\theta_{\infty}$. Both must be added to the system.
+\sindex{convection, boundary condition}
+
+Radiation conditions of the type
+$-k\derp{\theta}{n}=\varepsilon_{r}\sigma_{\!SB}(\theta^{4}-\theta_{\infty}^{4})$,
+with $\sigma_{\!SB}$ the Stefan--Boltzmann constant and $\varepsilon_{r}$ the
+emissivity, are
+nonlinear and cannot be handled in this linear setting; a first approximation
+is a temperature-dependent exchange coefficient $h=h(\theta)$, and the proper
+treatment goes through \op{pasapas}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+mod_hol = (arc23 et arc34)
+          mode convection;
+mat_hol = mod_hol mate 'H' 1.;
+
+KK_hol = cond mod_hol mat_hol;
+Fhole  = conv mod_hol mat_hol
+              'T' 200.;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+A distributed heat source inside the body is created with \op{sour[ce]}
+\dindex{sour[ce]}{volume heat source}, given its value, the domain it applies
+to and the model.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+Fsource = sour mod 100. dom;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The temperature field is finally obtained by solving the assembled system with
+\op{reso[udre]}. Note that \emph{both} the conductivity matrix \op{KK} of
+the domain and the convection matrix \op{KK\_hol} of the boundary condition
+appear in the stiffness term -- that is what distinguishes a convection
+condition from an imposed flux, which contributes only to the right-hand side.
+
+All the right-hand side contributions are concatenated with \op{et}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+KTOT = KK et KK_hol et AA;
+FTOT = Fd23 et Fd34 et Fhole
+            et Fsource;
+
+TT = reso KTOT FTOT;
+
+trace TT dom;
+\end{verbatim}
+\end{castemlines}
+
+\noindent Varying boundary temperatures, fluxes or convection coefficients,
+and volume heat sources, are imposed with the same \op{coor}/\op{masq}
+constructions as the varying pressure above.
+
+\begin{optable}{Thermal problem setting}
+mode[le] \ldots thermique & thermal finite element model \\
+mode[le] \ldots convection & model carrying a convection boundary condition \\
+cond[uctivite] & conductivity matrix \\
+capa[cite] & capacity matrix \\
+flux & nodal flux equivalent to a boundary heat flux \\
+conv[ection] & nodal flux of a convection condition \\
+sour[ce] & nodal flux of a volume heat source \\
+\end{optable}
+
+\section{An unexpected use of the thermal solver}
+\label{sec:elas:torsion}
+
+\cindex{Laplace equation}\cindex{thermal analogy}%
+\cindex{Saint-Venant torsion}\cindex{warping function}%
+\cindex{torsional rigidity}\cindex{torsion centre}%
+\cindex{Timoshenko beam}\cindex{shear correction coefficient}%
+\cindex{beam cross-section properties}%
+Before leaving the thermal operators, one idiom worth knowing, because it is
+the kind of thing that distinguishes someone who knows a finite element code
+from someone who only knows one physics in it: \textbf{the thermal solver can
+be used to solve any Laplace problem}, whatever it means physically.
+
+The classical example is the \emph{Saint-Venant torsion} of a prismatic beam.
+When a bar of arbitrary cross-section is twisted, plane sections do not stay
+plane -- they warp out of plane by a function $\varphi(x,y)$ which satisfies,
+over the cross-section $S$,
+\begin{equation}
+  \Delta \varphi = 0 \quad \text{in } S,
+  \qquad
+  \derp{\varphi}{n} = y\,n_{x} - x\,n_{y} \quad \text{on } \partial S
+\label{eq:elas:warping}
+\end{equation}
+and from which the torsional rigidity $J$ follows by integration over the
+section. That is a Laplace equation with a prescribed normal derivative --
+mathematically identical to steady heat conduction with an imposed boundary
+flux, which is exactly what the previous section solved.
+
+So the cross-section is meshed as a 2D domain, given a \emph{thermal} model
+with unit conductivity, and the warping function is computed as if it were a
+temperature.
+
+\begin{castemcom}
+The model is \op{thermique} even though the problem is mechanical. The
+conductivity is set to 1, so that \op{cond} assembles exactly the discrete
+Laplacian.
+
+\op{flux} imposes the boundary term of~\eqref{eq:elas:warping}. A pure
+Neumann problem is defined only up to a constant, so one point must be fixed
+-- any point will do, and the choice shifts $\varphi$ without changing $J$.
+
+The torsional rigidity is then an integral over the section, obtained with
+\op{intg} \dindex{intg[rer]}{integrate a field over a domain}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti dime 2 elem tri3;
+
+* sect = mesh of the cross-section
+modt = sect mode thermique isotrope;
+matt = modt mate 'K' 1.;
+
+KK = cond modt matt;
+
+* fix the constant at one point
+p0  = sect poin proc (0. 0.);
+bl0 = bloq 'T' p0;
+f0  = depi bl0 0.;
+
+* ... boundary flux, built from the
+* normal to the contour (see text)
+
+phi = reso (KK et bl0) (fbord et f0);
+
+trace phi sect;
+\end{verbatim}
+\end{castemlines}
+
+\sindex{"@Torsion (procedure)}\cindex{Maxwell--Betti theorem}%
+\noindent This is the basis of the \texttt{@Torsion} procedure presented at
+the Club Cast3M by Gornet~\cite{Gornet:club2017}, which computes from a
+meshed cross-section its area and centroid, its principal second moments, the
+warping function, the torsional rigidity, the position of the torsion centre
+-- located through the Maxwell--Betti reciprocal theorem -- and the shear
+correction coefficients, i.e. everything a Timoshenko beam model needs. It is
+validated there on triangular, rectangular, L- and C-sections, on hollow
+sections with fillets, and on NACA aerofoil profiles.
+
+That procedure is not distributed with \texttt{Cast3M} and the presentation
+gives only extracts of it, so it would have to be rebuilt from the slides.
+The construction above is the core of it, and rebuilding the rest is a good
+project: see the exercises.
+
+%%%
+\section{Material coefficients varying with temperature}
+
+Suppose now that a law correlates a material property $P$ with the temperature
+$\theta$ -- the Young modulus $E(\theta)$, say, or the dilation coefficient
+$\alpha(\theta)$. The question is how to compute the spatial distribution of
+$P$ in the presence of an inhomogeneous temperature field $\theta(x)$, i.e.
+\[ P(x)=P(\theta(x)) \]
+
+\noindent The construction is the one used above for the inclusion, with the
+masks replaced by an interpolation of the measured law. In practice there are
+two routes: either evaluate the law directly as an algebraic expression in the
+temperature field, or tabulate it as an \op{evolution} and interpolate with
+\op{ipol}. The second is what you want when the law comes from measurements,
+and is what the data-reading section of chapter~\ref{chap:importexport} is
+for.
+
+\section*{Summary}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+
+The whole chapter is one sequence of five operators, and it is the same
+sequence for elasticity and for heat conduction:
+
+\begin{center}
+\begin{tabular}{@{}l@{\hspace{8mm}}l@{\hspace{8mm}}l@{}}
+                     & \textbf{elasticity} & \textbf{thermal} \\[1mm]
+model                & \op{mode \ldots mecanique} & \op{mode \ldots thermique} \\
+material             & \op{mate 'YOUN' 'NU'}      & \op{mate 'K' 'RHO' 'C'} \\
+matrix               & \op{rigi}                  & \op{cond}, \op{capa} \\
+boundary conditions  & \op{bloq} + \op{depi}      & \op{bloq 'T'} + \op{depi} \\
+solution             & \op{reso}                  & \op{reso} \\
+\end{tabular}
+\end{center}
+
+\noindent Imposed conditions are handled by Lagrange multipliers, so they
+\emph{add} unknowns rather than removing them, and those multipliers are the
+reactions, recovered with \op{reac}. Loads that are not simply nodal forces
+-- pressure, weight, thermal expansion -- are all built the same way: form a
+field, integrate it against the shape functions with the operator that
+belongs to it (\op{pres}, \op{mass}, \op{thet}), and add the result to the
+right-hand side. Spatially varying data, whether a load or a material
+parameter, is built with \op{coor} and \op{masq} and then moved to the Gauss
+points with \op{chan}.
+
+\section*{Exercises}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+
+\begin{enumerate}
+\item \textbf{Stresses and strains in a plate with a hole.} Run the program
+  presented in this chapter and:
+  \begin{itemize}
+  \item check the stress distribution for all types of applied force: body
+    force, applied surface pressure, tangential traction;
+  \item compute the solution for a given resultant force applied to the upper
+    face of the plate, using both \op{forc[e]} and \op{pres[sion]}. Explain
+    the difference between the two;
+  \item compare the computed stress concentration factor with the
+    theoretical value $K_t=3$, and study how it changes as the ratio
+    $r/L$ of hole radius to plate width decreases.
+  \end{itemize}
+  See the file \texttt{traction\_trou.dgibi}.
+
+\item \textbf{Mesh convergence.} Repeat the computation with \op{nel} equal to
+  5, 10, 20 and 40 and plot the maximum von Mises stress against the number of
+  degrees of freedom. At which refinement is the result converged to within
+  1\%? Compare the convergence of the displacement with that of the stress and
+  explain why they differ.
+
+\item \textbf{Elastic and thermal example files.} Run the elasticity example
+  files \texttt{elas*.dgibi} and the thermal ones \texttt{ther*.dgibi} from
+  the \texttt{cast3m\_dir/dgibi} directory of your installation, and read the
+  notes in \texttt{cast3m\_dir/dgibi/annotated\_testing\_files\_98.pdf} and
+  on the \textbf{Exemples} page of the website.
+
+\item \textbf{Torsion by the thermal analogy.} Following
+  section~\ref{sec:elas:torsion}, compute the warping function and the
+  torsional rigidity $J$ of a \emph{circular} section, for which the exact
+  answer is $J=\pi R^{4}/2$ and the warping is identically zero -- a good
+  check that your boundary term is right. Then do a square section, where
+  $J \simeq 0.1406\,a^{4}$ and the warping is not zero, and plot it. Finally
+  a thin rectangle, and compare with $J\simeq\frac{1}{3}ab^{3}$.
+
+  \emph{Going further:} rebuild the rest of \texttt{@Torsion} -- centroid,
+  principal axes and second moments, torsion centre, shear coefficients --
+  as a procedure of your own taking a meshed section and returning a table.
+  It is a satisfying small project and the result is genuinely useful.
+
+\item \textbf{Thermoelastic coupling.} Compute the temperature field of the
+  plate with the hole with the boundary conditions of
+  section~\ref{sec:elas:thermal}, then use it as a loading for the elastic
+  problem through a thermal dilation coefficient \texttt{'ALPH'}. Where are
+  the largest stresses, and why are they not where the temperature is
+  highest?
+\end{enumerate}

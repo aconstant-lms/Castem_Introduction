@@ -1,0 +1,413 @@
+\chapter{\textbf{Eigenvalue problems: vibrations and buckling}}
+\label{chap:eigen}
+
+\section*{Outline}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+
+The two previous chapters solved $KU=F$: given a load, find the response.
+This chapter asks a different question -- for which loads, or at which
+frequencies, does the structure respond \emph{without} being driven? Both
+answers come from an eigenvalue problem, and in \texttt{Cast3M} both are
+reached by the same route.
+
+\begin{align}
+  \text{free vibration:} \qquad & \left[K - (2\pi f)^{2} M\right] X = 0
+  \label{eq:eigen:vibr} \\[1mm]
+  \text{buckling:} \qquad & \left[K + \lambda\, K_{\sigma}\right] X = 0
+  \label{eq:eigen:flam}
+\end{align}
+
+\cindex{eigenvalue problem}\cindex{vibration, free}\cindex{buckling}%
+\cindex{natural frequency}\cindex{critical load}%
+\noindent In the first, $M$ is the mass matrix and the eigenvalue is a
+frequency. In the second, $K_{\sigma}$ is the \emph{geometric} stiffness
+produced by a reference stress state, and the eigenvalue $\lambda$ is the
+factor by which that reference load must be multiplied to make the structure
+buckle. The mathematics is the same; only the second matrix changes.
+
+We use the cylinder and the hyperbolic paraboloid of
+section~\ref{sec:mesh:revolution}.
+
+\section{Free vibration}
+
+\subsection{Setting up the problem}
+
+A vibration computation needs exactly one thing beyond a static one: a mass
+matrix, which means a density in the material.
+
+\begin{castemcom}
+The model, the material and the stiffness are built exactly as in
+chapter~\ref{chap:elasticity}; \op{mass[e]} \dindex{mass[e]}{mass matrix}
+builds the mass matrix from the same model and material.
+
+\sindex{coq4}\cindex{shell element}\cindex{shell thickness}%
+\textbf{\texttt{'RHO'} is compulsory.} Without a density there is no mass
+matrix, and the eigenvalue problem is meaningless. A shell also needs its
+thickness, supplied through \op{cara} \dindex{cara[cteristiques]}{geometric characteristics} and concatenated to the material with \op{et} -- the single
+most common reason a modal computation returns absurd frequencies.
+
+The boundary conditions enter the stiffness exactly as before. Here the lower
+rim of the cylinder is clamped. Note that \op{bloq 'DEPL' 'ROTA'} blocks both
+translations and rotations, which is what an encastred shell edge needs.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+opti dime 3 elem qua4;
+
+mod = cyl mode mecanique
+          elastique isotrope coq4;
+
+mat = mod mate 'YOUN' 2.1e11
+               'NU'   0.3
+               'RHO'  7800.;
+car = mod cara 'EPAI' 0.002;
+mat = mat et car;
+
+KK = rigi mod mat;
+MM = mass mod mat;
+
+bl = bloq 'DEPL' 'ROTA' bas;
+
+KT = KK et bl;
+\end{verbatim}
+\end{castemlines}
+
+\subsection{Computing the modes}
+
+\op{vibr[ation]} \dindex{vibr[ation]}{eigenvalue problem, vibration} solves
+\eqref{eq:eigen:vibr}. It offers four algorithms, and which one you pick
+matters more than it looks:
+
+\sindex{vibr[ation], 'PROC'[HE]}\sindex{vibr[ation], 'SIMU'[LTANE]}%
+\sindex{vibr[ation], 'INTE'[RVALLE]}\sindex{vibr[ation], 'IRAM'}%
+\cindex{Lanczos algorithm}\cindex{Arnoldi algorithm}%
+\begin{optable}{The four options of \texttt{vibr[ation]}}
+'PROC'[HE] & the \texttt{n} modes nearest each frequency of a given list.
+             Robust, and the one to use when you already know roughly where
+             the modes are \\
+'SIMU'[LTANE] & the \texttt{n} modes nearest one frequency, by Lanczos.
+                Efficient when many modes are wanted -- \textbf{the sensible
+                default} \\
+'INTE'[RVALLE] & all modes in a frequency band, by bisection. The option to
+                 use when the band matters rather than the count, but
+                 generally far more expensive \\
+'IRAM' & implicitly restarted Arnoldi, via \textsc{arpack}. The only option
+         that accepts a damping matrix \\
+\end{optable}
+
+\begin{castemcom}
+Here we ask for the ten lowest modes near zero, with \op{'SIMU'}. The
+operator takes the stiffness and the mass matrix, in that order, and returns
+a \op{table}.
+
+\medskip
+\textbf{The result structure is worth memorising}, because every
+post-processing step goes through it. The table has an index \op{'MODES'},
+itself a table indexed by mode number, and each entry holds:
+
+\begin{itemize}[leftmargin=1.2em,itemsep=0pt,topsep=2pt]
+\sindex{vibr[ation], 'MODES'}\sindex{'FREQUENCE'}%
+\sindex{'DEFORMEE\_MODALE'}\sindex{'MASSE\_GENERALISEE'}%
+\cindex{mode shape}\cindex{generalised mass}%
+\item \texttt{'FREQUENCE'} -- the frequency, in Hz;
+\item \texttt{'DEFORMEE\_MODALE'} -- the mode shape, a \op{chpoint};
+\item \texttt{'MASSE\_GENERALISEE'} -- the generalised mass;
+\item \texttt{'NUMERO\_MODE'} -- the mode number.
+\end{itemize}
+
+\noindent Frequencies come out in Hz, in whatever unit system the matrices
+were built in -- so with SI data you get Hz, and with a density in
+\texttt{g/mm}$^{3}$ you do not.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+nmod = 10;
+
+res = vibr 'SIMU' 0. nmod KT MM;
+
+* list the frequencies
+lfreq = prog;
+repeter bmod nmod;
+  i  = &bmod;
+  fi = res . 'MODES' . i . 'FREQUENCE';
+  lfreq = lfreq et (prog fi);
+  mess 'mode ' i ' : ' fi ' Hz';
+fin bmod;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+A mode shape is a \op{chpoint} like any displacement field, so it is plotted
+with \op{defo} \dindex{defo[rmee]}{deformed shape} and \op{trac[er]}. Drawing
+the undeformed shape with an amplification of \op{0.} and superposing it is
+the usual way to make the mode legible.
+
+\medskip
+Remember that a mode shape has no physical amplitude -- it is normalised, here
+by the generalised mass. Only its \emph{shape} and its frequency mean
+anything; the numerical values of the displacements do not.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+repeter bdes nmod;
+  i   = &bdes;
+  di  = res . 'MODES' . i
+            . 'DEFORMEE_MODALE';
+  d0  = defo cyl di 0.  noir;
+  dn  = defo cyl di 1.  vert;
+  titr (chai 'mode ' i);
+  trac cach (d0 et dn);
+fin bdes;
+\end{verbatim}
+\end{castemlines}
+
+\cindex{rigid body modes}\cindex{modal convergence}%
+\noindent Two checks to run on any modal computation before trusting it.
+First, count the zero frequencies. A free-free structure must return six of
+them in 3D (three in 2D) -- its rigid body modes -- and a clamped one none.
+A stray near-zero frequency means part of the mesh is not attached, very
+often a \op{elim} that was forgotten, as on the cylinder seam.
+
+\op{ense[mble]}, from section~\ref{sec:elas:ense}, answers this before you
+run anything: it reports how many rigid body motions the restrained stiffness
+still permits, so you know in advance how many zero frequencies to expect and
+can tell a genuine one from a disconnected mesh. Second, refine the
+mesh and watch the high modes: they converge far more slowly than the low
+ones, and a mode whose wavelength spans only three or four elements is not
+resolved.
+
+\section{Buckling}
+
+\subsection{The geometric stiffness}
+
+Buckling asks at what load multiplier a structure loses stability. \cindex{geometric stiffness}\cindex{load multiplier}%
+The
+ingredient that makes it an eigenvalue problem is the \emph{geometric}
+stiffness matrix $K_{\sigma}$: the change in stiffness produced by an existing
+stress state. A membrane in tension is stiffer in bending; the same membrane
+in compression is less stiff, and when the loss exactly cancels the elastic
+stiffness, it buckles.
+
+The computation therefore has two stages: a static computation under a
+\emph{reference} load, and then the eigenvalue problem built on the stresses
+it produced.
+
+\begin{castemcom}
+Before anything else, check the restraints with \op{ense[mble]}
+(section~\ref{sec:elas:ense}). \op{flambage} needs a non-singular stiffness,
+and an under-restrained model does not fail cleanly here -- it returns
+critical multipliers that look plausible and mean nothing.
+
+\medskip
+Stage one is an ordinary elastic computation. The load is a reference load,
+and its magnitude is arbitrary -- the eigenvalue $\lambda$ will scale it. Take
+it equal to 1 in whatever unit is convenient and the critical load reads
+directly off $\lambda$.
+
+A linear eigenvalue analysis assumes a linear pre-buckling state, so the
+stress is computed with the linear strain measure: \op{opti epsi lineaire}
+and the \texttt{'LINE'} option of \op{sigm}, as in the shipped example
+\texttt{flam1.dgibi}.
+
+\op{ksigma} \dindex{ksigma}{geometric stiffness matrix} then builds
+$K_{\sigma}$ from the model and the stress field.
+
+\medskip
+\textbf{Two traps in one line.} The keyword \texttt{'FLAM'} is
+\emph{compulsory} if the matrix is to be used for buckling -- without it you
+get a geometric stiffness built for a different purpose. And the geometric
+characteristics \op{car} must be passed for the element families whose
+stiffness depends on them -- the notice names thick shells, DST, beams and
+pipes, and the shells used here carry a thickness, so pass it. It is an
+optional \emph{positional} argument, so a missing \op{car} is not flagged as
+a syntax error.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* --- reference load: axial
+*     compression of the cylinder
+opti epsi lineaire;
+
+fref = forc (0. 0. -1.) haut;
+
+u0   = reso KT fref;
+sig0 = sigm 'LINE' mod mat u0;
+
+ksig = ksigma mod sig0 car 'FLAM';
+\end{verbatim}
+\end{castemlines}
+
+\subsection{The \texttt{flambage} procedure}
+
+\begin{castemcom}
+\op{flambage} \sindex{flambage} is a \emph{procedure}, not an operator: it
+takes a single \op{table} of inputs and returns a table of results, exactly
+like \op{pasapas}.
+
+\sindex{flambage, 'OBJM'}\sindex{flambage, 'CLIM'}\sindex{flambage, 'NMOD'}%
+\sindex{flambage, 'LAM1'}\sindex{flambage, 'LAM2'}\sindex{flambage, 'SIG1'}%
+\sindex{flambage, 'LAMB'}\sindex{flambage, 'DEPL'}%
+The inputs are the model \texttt{'OBJM'}, the boundary conditions
+\texttt{'CLIM'}, the number of modes \texttt{'NMOD'}, and the bracket
+$[\texttt{'LAM1'},\texttt{'LAM2'}]$ within which the multiplier is sought.
+The stress state is given either directly -- \texttt{'SIG1'} for the part that
+scales with the multiplier, \texttt{'SIG0'} for a part that does not, plus
+\texttt{'MATE'} and \texttt{'CARA'} -- or as the two matrices
+\texttt{'RIGI'} and \texttt{'KSIG'} if you prefer to assemble them yourself.
+
+\medskip
+The bracket matters. Set \texttt{'LAM1'} slightly above zero, never to zero,
+and \texttt{'LAM2'} well above the multiplier you expect; if the search
+returns nothing, widen it before suspecting the model.
+
+The result is a table indexed by mode number, each entry holding
+\texttt{'LAMB'}, the critical multiplier, and \texttt{'DEPL'}, the buckling
+mode shape.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+etab = table;
+etab . 'OBJM' = mod;
+etab . 'CLIM' = bl;
+etab . 'MATE' = mat;
+etab . 'CARA' = car;
+etab . 'SIG1' = sig0;
+etab . 'LAM1' = 0.001;
+etab . 'LAM2' = 1.e6;
+etab . 'NMOD' = 4;
+
+stab = flambage etab;
+
+repeter bflam 4;
+  i  = &bflam;
+  la = stab . i . 'LAMB';
+  mess 'mode ' i
+       ' critical factor ' la;
+
+  mi = stab . i . 'DEPL';
+  trac cach ((defo cyl mi 0. noir)
+         et  (defo cyl mi 1. rouge));
+fin bflam;
+\end{verbatim}
+\end{castemlines}
+
+\noindent Because the reference load was a unit force, the critical load is
+$\lambda$ itself. For the axially compressed cylinder, compare it with the
+classical result
+\[ N_{cr} = \frac{E\,t^{2}}{\sqrt{3(1-\nu^{2})}} \]
+\cindex{imperfection sensitivity}\cindex{cylinder, axial buckling}%
+per unit circumference. You will almost certainly find the computation
+\emph{above} that value, and the discrepancy is the physics worth discussing:
+the real cylinder is extremely sensitive to geometric imperfections, and the
+linear eigenvalue analysis knows nothing about them. A buckling eigenvalue is
+an upper bound, not a design load.
+
+\subsection*{A warning about the name}
+
+\dindex{flam}{combustion -- \emph{not} buckling}%
+\cindex{flam, confusion with flambage}%
+The procedure is \op{flambage}, spelled out. \op{flam} is a \emph{different
+operator} -- it integrates hydrogen--oxygen combustion -- so the usual
+four-character abbreviation does not apply here and silently calls the wrong
+thing.
+
+\section{Vibration under prestress}
+
+\cindex{prestress, effect on frequencies}\cindex{vibration under prestress}%
+The two problems combine. A stress state changes the stiffness, so it changes
+the natural frequencies: a guitar string rises in pitch as it is tightened,
+and a column in compression drops in frequency until, at the buckling load,
+its first frequency reaches zero. That limit is the physical link between the
+two halves of this chapter.
+
+\begin{castemcom}
+Adding the geometric stiffness to the elastic stiffness before calling
+\op{vibr} is all that is needed. Here the cylinder carries an axial load
+\op{pcharge} times the reference load.
+
+Sweeping \op{pcharge} from zero up to the critical multiplier and plotting
+the first frequency against it gives the curve that ends at zero -- the
+clearest demonstration available that buckling is the point where a vibration
+frequency vanishes.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+la1     = stab . 1 . 'LAMB';
+pcharge = 0.5 * la1;
+
+sigp = pcharge * sig0;
+ksp  = ksigma mod sigp car 'FLAM';
+
+KP = KK et ksp et bl;
+
+resp = vibr 'SIMU' 0. 5 KP MM;
+
+f1 = resp . 'MODES' . 1
+          . 'FREQUENCE';
+mess 'first frequency under load: '
+     f1 ' Hz';
+\end{verbatim}
+\end{castemlines}
+
+\section*{Summary}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+
+Both problems are built from the matrices of chapter~\ref{chap:elasticity}
+plus one more:
+
+\begin{center}
+\begin{tabular}{@{}l@{\hspace{8mm}}l@{\hspace{8mm}}l@{}}
+                   & \textbf{vibration} & \textbf{buckling} \\[1mm]
+second matrix      & \op{mass} & \op{ksigma \ldots 'FLAM'} \\
+needs              & \texttt{'RHO'} & a reference stress field \\
+solved by          & \op{vibr} (operator) & \op{flambage} (procedure) \\
+eigenvalue is      & a frequency, Hz & a load multiplier \\
+result index       & \texttt{.'MODES'.i.'FREQUENCE'} & \texttt{.i.'LAMB'} \\
+mode shape         & \texttt{.'DEFORMEE\_MODALE'} & \texttt{.'DEPL'} \\
+\end{tabular}
+\end{center}
+
+\noindent Four things to carry away. Check the restraints with
+\op{ense[mble]} first: both methods need to know how many rigid body motions
+survive, and neither complains if the answer is wrong. A shell needs
+\op{cara} with its thickness, passed everywhere the material is.
+\op{ksigma} needs \texttt{'FLAM'}. And an eigenvalue computation is linear: it gives the
+bifurcation point of the \emph{perfect} structure, which for
+imperfection-sensitive shells can be well above the real collapse load.
+Chapter~\ref{chap:largestrain} shows how to follow the post-buckling path
+instead.
+
+\section*{Exercises}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+
+\begin{enumerate}
+\item \textbf{Euler's column.} Mesh a cantilever beam with \op{coq2} elements
+  and compute its first buckling load. Compare with
+  $N_{cr}=\pi^{2}EI/(4L^{2})$. Then repeat with both ends pinned and with both
+  clamped, and check that the critical loads are in the ratio $1:4:16$
+  predicted by the effective lengths $2L$, $L$ and $L/2$. The shipped example
+  \texttt{flam1.dgibi} is the model to start from.
+
+\item \textbf{Modes of the cylinder.} Compute the twenty lowest modes of the
+  clamped cylinder and sort them by the number of circumferential lobes.
+  Which has the lowest frequency, and why is it not the one with the simplest
+  shape? Refine the mesh and identify which modes have converged.
+
+\item \textbf{The cooling tower.} Compute the first modes of the hyperbolic
+  paraboloid of section~\ref{sec:mesh:revolution}, clamped at the base and
+  free at the top. How does the lowest frequency change with the twist angle
+  \op{alph}, at constant height and constant base radius? This is the
+  structural reason for the shape.
+
+\item \textbf{Frequency against load.} Sweep the axial load on the cylinder
+  from zero to the critical value in ten steps, computing the first frequency
+  at each. Plot $f_{1}^{2}$ against the load. The result should be close to a
+  straight line hitting zero at the buckling load -- explain why, from
+  \eqref{eq:eigen:vibr} and \eqref{eq:eigen:flam}.
+
+\item \textbf{Imperfection sensitivity.} Add to the cylinder mesh a small
+  geometric imperfection in the shape of its first buckling mode, with an
+  amplitude of a fraction of the thickness, using \op{plus} as in
+  section~\ref{sec:mesh:deform}. Recompute the buckling load. How fast does
+  it fall as the amplitude grows?
+\end{enumerate}

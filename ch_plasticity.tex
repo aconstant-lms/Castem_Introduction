@@ -1,0 +1,790 @@
+\chapter{\textbf{Elastoplasticity}}
+\label{chap:plasticity}
+
+
+\section*{Outline}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Outline}
+
+This chapter treats the first genuinely nonlinear problem of the booklet.
+It does so twice: first by programming an incremental algorithm by hand, so
+that the structure of a nonlinear solver is explicit, and then by handing the
+same problem to the standard \op{pasapas} procedure, which is what you will
+actually use. Read both -- the second makes sense only once you have seen the
+first.
+
+The constitutive theory itself is only used here, not developed. For that,
+the standard reference is Simo and Hughes~\cite{Simo:1998}: yield surfaces,
+flow rules, hardening, the return-mapping algorithms that integrate them and
+the consistent tangent operators that make Newton converge. Dhondt's
+book~\cite{Dhondt:2004} covers the same material from the implementer's
+side, in three dimensions and with thermomechanical coupling, and is the one
+to read if you intend to write a constitutive routine of your own rather than
+call one. Both are referred to again where the convergence output is
+discussed in section~\ref{sec:plas:pasapas}.
+
+\section{Plasticity -- programming of an incremental algorithm}
+\label{sec:plas:incremental}
+
+The example presented here is deliberately restricted to an elastoplastic
+computation with a \emph{constant} stiffness matrix -- the initial elastic
+stiffness is used at every iteration, so it is assembled and factorised once.
+Convergence is therefore linear rather than quadratic, but each iteration is
+cheap and the algorithm is robust. In this version the operator
+\op{ecou[lement]} \dindex{ecou[lement]}{plastic flow, stress increment} does
+the work of integrating the constitutive law, i.e. the radial return is not
+programmed explicitly in \textsc{gibiane}.
+
+\begin{castemcom}
+We start from a \emph{square} domain \op{dom} -- note that this is not the
+plate with a hole of the previous chapters, but a plain square built from
+four straight edges -- on which the following loading is defined:
+
+\begin{itemize}
+\item imposed displacement
+  \[ u_y |_{d34} = t\,\op{u1}, \qquad u_x |_{d23} = t\,\op{u2} \]
+\item symmetry conditions on the two remaining edges, \op{d12} and
+  \op{d41};
+\item free surfaces elsewhere.
+\end{itemize}
+
+\noindent $t\in[0,1]$ is the fictitious time parameter and the loading is
+applied in \op{ndt} steps of equal length. With \op{u1}${}=0$ the loading is
+a simple tension in the $x$ direction; set it non-zero for a biaxial path.
+
+The projection matrices associated with the blocked degrees of freedom are
+\op{AA1}, \op{AA2}, \op{AA3} and their assembly \op{AA}, and the imposed
+forces are stored for each step \op{n} in the force vector \op{FF . n} of
+the table \op{FF}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+* a plain square, independent of the
+* plate of chapter 2.  It overwrites
+* dom, d12 ... d41, so section 5.2
+* rebuilds the plate before using it.
+q1 = 0. 0.;  q2 = 1. 0.;
+q3 = 1. 1.;  q4 = 0. 1.;
+nc = 10;
+d12 = droi nc q1 q2;
+d23 = droi nc q2 q3;
+d34 = droi nc q3 q4;
+d41 = droi nc q4 q1;
+dom = dall d12 d23 d34 d41;
+
+u1 = 0.; u2 = 0.01; ndt = 8;
+
+AA1 = (bloq uy d34 );  AA2 = (bloq ux d23);
+AA3 = (bloq uy d12) et (bloq ux d41);
+AA = AA1 et AA2 et AA3;
+
+FF1 = depi AA1 u1; FF2 = depi AA2 u2;
+
+FF = table;
+  
+repeter boucle (ndt + 1);
+  n = &boucle - 1;  
+  FF . n = ((flot n) / ndt ) * (FF1 et FF2);
+fin boucle;
+
+\end{verbatim}
+\end{castemlines}
+ 
+\begin{castemcom}
+We first define the parameters of the constitutive behaviour:
+
+\begin{itemize}
+\item the Young modulus \op{EE} and the Poisson ratio \op{nu};
+\item the yield stress \op{sigy} and the hardening modulus \op{H}.
+\end{itemize}
+
+\noindent An elastoplastic behaviour with \emph{kinematic} hardening is then
+attached to the mesh \op{dom} with the \op{mode[le]} operator, and the
+parameters of the model are attached to the model \op{mod} through
+\op{mate[riaux]}.
+
+The stiffness \op{KK} corresponding to the elastic part of the behaviour is
+computed with \op{rigi[dite]} exactly as in the elastic case, so it depends
+on \op{EE} and \op{nu} only. It is this matrix -- assembled once, before the
+loop -- that makes the algorithm a constant-stiffness one.
+
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+  EE = 2.e11;   nu = 0.3;
+  sigy = 600.e6;
+  H = 2000.e6;
+
+  mod  = dom mode mecanique elastique
+         isotrope plastique cinematique;
+  mat = mate mod 'YOUN' EE 'NU' nu
+              'H' H 'SIGY' sigy;
+
+  KK = rigi mod mat;
+
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+\op{tol\_res} is the tolerance accepted on the equilibrium equation and
+\op{it\_max} caps the number of equilibrium iterations per load step: these
+two are the only numerical parameters of the computation.
+
+The tables of plastic strains, internal variables, stresses and displacements
+are initialised using \op{table} for the generalised list structure and
+\op{zero} for the value at $t=0$. Note that \op{zero} needs the name of the
+field type it is creating -- \texttt{'CONTRAIN'}, \texttt{'VARINTER'},
+\texttt{'DEFINELA'} -- because the number and names of the internal variables
+depend on the constitutive model declared above.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+  tol_res = 1.e-3;
+  it_max  = 20;
+
+  UU = table;    sig = table;
+  epsp = table;  alpha = table;
+
+  UU . 0 = manu 'CHPO' dom 2
+                'UX' 0. 'UY' 0.;
+  epsp . 0 = zero mod 'DEFINELA';
+  alpha . 0 = zero mod 'VARINTER';
+  sig . 0 = zero mod 'CONTRAIN';
+
+\end{verbatim}
+\end{castemlines}
+
+
+
+\begin{castemcom}
+The loop computing the load increments is named \op{it\_char}. It starts by
+initialising the fields at step $n$ with the values converged at the previous
+step $n-1$ -- the standard predictor of an incremental algorithm -- and then
+computes a first elastic displacement increment \op{du} from the increment of
+the applied load.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+repeter it_char ndt;
+ n = &it_char; mess 'increment charge ' n;
+    
+ UU . n   = UU . (n - 1);
+ epsp . n = epsp . (n - 1);
+ sig . n   = sig . (n - 1);
+ alpha . n = alpha . (n - 1);
+ 
+ du = reso (KK et AA) (FF . n - FF . (n - 1 )); 
+    
+ UU . n = UU . n + du;
+ deps = epsi mod du;
+
+\end{verbatim}
+\end{castemlines}
+
+\pagebreak
+
+\begin{castemcom}
+Inside the load-increment loop \op{it\_char} a second loop \op{it\_equi} is
+built. It contains the integration of the constitutive law -- the update of
+the stresses and of the internal variables, performed by \op{ecou[lement]} --
+followed by the verification of equilibrium.
+
+\op{ecou} returns the new stress, the new internal variables and the
+increment of plastic strain, given the state at the beginning of the step and
+the total strain increment \op{deps}.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+ 
+repeter it_equi it_max;
+
+nsig nalpha ndepsp = 
+  ECOU mod (sig . n) (alpha . n) deps   mat;
+
+sig . n   = nsig;
+alpha . n = nalpha;
+epsp . n  = (epsp . n) + ndepsp;
+  
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The verification of equilibrium starts with the computation of the residual
+\op{RR}, defined as the difference between the imposed exterior forces
+\op{FF . n} and the ``divergence'' of the stresses, i.e. the nodal forces
+$[\mathbb{B}^T]\tens{\sigma}$ obtained with \op{bsigma}. The last term
+removes the contribution of the imposed displacements from the nodal forces.
+
+Between \op{si} and \op{finsi} we test whether the max norm of the residual
+is smaller than the tolerance times the norm of the applied forces -- a
+\emph{relative} criterion, which is what makes \op{tol\_res} independent of
+the units of the problem -- and if so we \op{quit[ter]} the loop
+\op{it\_equi}.
+
+If the condition is not satisfied, a new displacement increment \op{du} is
+computed to balance the residual and we return to the beginning of
+\op{it\_equi} for another iteration: update of the internal variables and of
+the stresses, and so on.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+RR = ((FF . n) - (bsigma mod sig . n)
+              - (AA * (UU . n)));
+
+no_res = n_force RR;
+no_for = n_force ((FF . n) + (reac AA uu . n));
+
+si ((maxi no_res) < (tol_res * (maxi no_for))); 
+  quit it_equi;
+finsi;
+
+du = reso (KK et AA) RR;
+
+UU . n = UU . n + du; deps = epsi mod du;
+
+\end{verbatim}
+\end{castemlines}
+
+
+\begin{castemcom}
+These two commands close the equilibrium loop \op{it\_equi} and the
+load-increment loop \op{it\_char} respectively. Note that \op{fin} takes the
+name of the loop it closes, which is what makes nested loops readable.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+fin it_equi;
+
+fin it_char;
+\end{verbatim}
+\end{castemlines}
+
+\begin{castemcom}
+The commands \op{debp[rocedure]} and \op{finp[roc]} mark the beginning and
+the end of the procedure \op{n\_force}. By extracting the components
+\texttt{FX}, \texttt{FY} of the force field \op{ff} and combining them
+algebraically, it computes the norm field
+\[ \norm{\vect{f}} = \sqrt{f_x^2 + f_y^2}
+   \quad \text{with} \quad
+   \vect{f} = f_x \vect{e}_x + f_y \vect{e}_y \]
+
+\medskip
+\textbf{Place this procedure at the top of your file}, before the loops that
+call it: \textsc{gibiane} is interpreted line by line, so a procedure must
+have been read before it is invoked.
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+debproc n_force ff*chpoint;
+      
+  lanorme =
+   (((exco ff 'FX' 'SCAL')
+     *(exco ff 'FX' 'SCAL')) +
+    ((exco ff 'FY' 'SCAL')
+     *(exco ff 'FY' 'SCAL'))) ** 0.5;
+
+finproc lanorme; 
+
+\end{verbatim}
+\end{castemlines}
+
+\section{Plasticity - computation using \texttt{pasapas} }
+\label{sec:plas:pasapas}
+
+\textbf{Note.} Section~5.1 overwrote \op{dom} and \op{d12}\ldots\op{d41}
+with a plain square. Before running this section, rebuild the plate of
+chapter~\ref{chap:meshing} -- or simply restore it with
+\op{opti rest 'plate.dat'; rest;} if you saved it, as
+chapter~\ref{chap:importexport} suggests.
+
+\medskip
+In this section we shall illustrate the usage of the standard \texttt{castem} command 
+\texttt{pasapas} (fr. \emph{pas \`a pas}, step by step) command, which enables one to compute the solution of 
+a nonlinear problem. The case discussed next will be that of an elastoplastic problem.
+In the example we shall refer to the already defined geometry of the plate with a 
+circular hole (see chapter~\ref{chap:meshing} and~\ref{chap:elasticity} ) and will directly 
+start with the definition of the material, the boundary conditions. 
+
+\subsubsection*{Model and loading history}
+
+\begin{castemcom}
+The \texttt{mode[l]} and the \texttt{mate[riaux]}  operators are used as
+in the elastic case to define the material behaviour and its parameters.
+In this case the model is a  elastoplastic model 
+with  kinematic hardening. 
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+   mod_p = dom mode mecanique
+           elastique isotrope
+                  plastique cinematique;
+   mat_p   = mate mod_p 'YOUN' 2.e11  'NU' 0.3
+                        'SIGY' 200.e6  'H' 2.e9;
+
+\end{verbatim}
+\end{castemlines}
+
+As in the first version of the elastic computation in 
+chapter~\ref{chap:elasticity}, we shall define an imposed 
+displacement on the line $d_{34}$ of the plate. However 
+if the value of the displacement was fixed in the elastic 
+case, we shall define here a varying amplitude. 
+The introduction of the imposed displacements will 
+again be performed using a Lagrange multiplier technique. 
+
+
+If the imposed displacement can be written as:
+\begin{eqnarray}
+  \vect{u}^D(x,t) &=& a(t) \, \vect{u}_0(x)
+                      \qquad x \in \partial \Omega^d
+\nonumber   
+\end{eqnarray}
+Then the projection matrix $[\mathbb{A}]$ will be the same with 
+the one defined in the elastic case and will 
+not vary in time. We shall just have to introduce 
+the displacement amplitude in the program $a(t)$. 
+
+\begin{castemcom}
+We start again by defining the projection matrices and 
+assembles them into only one element: $[\mathbb{A}]$. 
+
+Next we define the associated nodal force vector 
+$[\mathbb{U}_0^D]$ of the imposed displacement distribution 
+$\vect{u}_0$, denoted as \texttt{ud34} in the program.  
+ 
+The amplitude $a(t)$ is defined by its graph. In \texttt{castem}
+this corresponds to a \texttt{evolution} object assembled from 
+the list of time instants \texttt{tt} and the corresponding 
+amplitudes \texttt{a\_ud34}.     
+
+The association of the amplitude \texttt{ev\_ud34} with the 
+corresponding nodal force vector \texttt{ud34} is done using 
+the \texttt{char[gement]} (fr. \emph{chargement}) operator. The string 
+\texttt{'DIMP'} announces that the loading is an 
+imposed displacement. The keywords for different loading types
+is specified in the help of the  \texttt{char[gement]}  
+and the  \texttt{pasapas} operators.  
+
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+  Ad12 = bloq uy d12;
+  Ad41 = bloq ux d41;
+  
+  Ad34 = bloq uy d34;
+  ud34  = depi Ad34 0.001;
+  
+  AA = Ad12 et Ad41 et Ad34;
+
+   tt     = prog 0. 5. 10. 15. 20.;  
+   a_ud34 = prog 0. 1. 0. -1. 0.;
+   
+   ev_ud34 = evol manu 'TEMPS' tt 'DIMP' a_ud34;
+   dess ev_ud34;
+   
+   ch_ud34 = char 'DIMP' ud34 ev_ud34; 
+ 
+ 
+\end{verbatim}
+\end{castemlines}
+
+\subsubsection*{The computation using \texttt{pasapas}}
+
+\begin{castemcom}
+The nonlinear computation is performed using the \texttt{pasapas} 
+operator.
+Its input variables are organized in a large \texttt{table}, 
+that means a generalized list, where the different indexes 
+specify the objects:
+\begin{itemize}
+  \item \texttt{'MODELE'} - the model
+  \item \texttt{'CARACTERISTIQUES'} - the material parameters
+  \item \texttt{'BLOCAGES\_MECANIQUES'} - the projection matrices for imposed displacement or temperature  
+  \item \texttt{'CHARGEMENT'} - the loads, expressed as histories of nodal forces, constructed with 
+      the \texttt{char[gement]} operator 
+  \item \texttt{'TEMPS\_CALCULES'} - the \texttt{list} of time instant where equilibrium has to be checked
+\end{itemize} 
+
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+   tabexp = table;
+      
+   tabexp . 'MODELE' = mod_p;
+   tabexp . 'CARACTERISTIQUES'  =   mat_p;
+
+   tabexp . 'BLOCAGES_MECANIQUES' = AA;
+   tabexp . 'CHARGEMENT'          = ch_ud34; 
+ 
+   tabexp . 'TEMPS_CALCULES' =
+                 prog 0. pas 1. 20.;
+
+   pasapas tabexp; 
+
+
+\end{verbatim}
+\end{castemlines}
+
+If the information provided for \texttt{pasapas} is consistent 
+then the computation starts and during the performance a series 
+of parameters are displayed for its monitoring. The output of the 
+example will be discussed next. 
+
+For each step number (\texttt{Numero du pas}), or the corresponding time
+instant (\texttt{Indice d evolution}), one line is printed per iteration of
+the inner loop that seeks plastic admissibility and global equilibrium.
+Reading those six columns is the difference between watching a computation
+and understanding it.
+
+\cindex{convergence monitoring}\sindex{Nplas}\sindex{Critere}%
+\sindex{Deps.max}\sindex{Eps.max}\sindex{Crit.flex}%
+\begin{center}
+\fcolorbox{black}{Gray}{%
+\begin{tabular}{@{\hspace{2mm}}>{\ttfamily}l@{\hspace{5mm}}p{86mm}@{\hspace{2mm}}}
+\multicolumn{2}{c}{\textbf{The \texttt{pasapas} convergence columns}} \\[2.mm]
+Iter      & the iteration number within the current step \\[1.mm]
+Nplas     & the \emph{number of integration points} whose internal variable
+            changed by more than $10^{-10}$ during this iteration, i.e. how
+            many points are currently flowing plastically \\[1.mm]
+Critere   & the convergence criterion on forces -- the quantity that must
+            fall below \texttt{'PRECISION'} \\[1.mm]
+Deps.max  & the largest \emph{increment} of cumulated plastic strain produced
+            by this iteration, $\max |\Delta p|$ \\[1.mm]
+Eps.max   & the largest \emph{cumulated} plastic strain reached anywhere in
+            the structure so far, $\max p$ \\[1.mm]
+Crit.flex & the same criterion as \texttt{Critere} but formed on the
+            \emph{moment} components -- \emph{flexion}, bending. Non-zero
+            only for elements with rotational degrees of freedom: beams,
+            plates, shells \\
+\end{tabular}}
+\end{center}
+
+\noindent The two criteria are relative, which is what makes
+\texttt{'PRECISION'} independent of your unit system. Writing $R$ for the
+residual nodal force field, $U^{D}$ for the imposed displacements and $A$ for
+the projection matrix of the blocked degrees of freedom,
+\begin{equation}
+  \texttt{Critere} \;=\;
+  \frac{\max\Bigl(\;\max_{\text{force dof}} |R| \;,\;
+                   \max |(U-U^{D})A| \;\Bigr)}{F_{ref}}
+\label{eq:plas:critere}
+\end{equation}
+\begin{equation}
+  \texttt{Crit.flex} \;=\;
+  \frac{\max_{\text{moment dof}} |R|}{M_{ref}}
+\label{eq:plas:critflex}
+\end{equation}
+
+\noindent Three things in~\eqref{eq:plas:critere} are worth noticing. The
+numerator is a \emph{maximum}, not a Euclidean norm, so one badly converged
+node is enough to hold up the whole step. It takes the larger of the force
+residual and the violation of the imposed displacements, so a boundary
+condition that is not being satisfied shows up in exactly the same number.
+And the denominators $F_{ref}$, $M_{ref}$ are reference magnitudes built
+internally from the applied loads and the reactions; when you set
+\texttt{'FTOL'} or \texttt{'MTOL'} they are replaced by 1, the criterion
+becomes an \emph{absolute} residual, and the column headings change to
+\texttt{Fresidu} and \texttt{Mresidu} accordingly -- a useful signal that
+you are no longer reading a relative number.
+
+Convergence of the step requires \emph{both} criteria to fall below their
+tolerances: \texttt{'PRECISION'}, default $10^{-4}$, and its moment
+counterpart. The strain columns carry no tolerance; they are there to be
+read by you.
+
+\subsection*{What the columns tell you in practice}
+
+\begin{itemize}
+\item \texttt{Critere} should fall by roughly an order of magnitude per
+  iteration. Falling and then stalling at some small value usually means the
+  step is too large for the constitutive integration;
+\item \texttt{Nplas} tells you how much of the structure is yielding. It
+  rising steadily from step to step is the plastic zone spreading, which is
+  physics. It oscillating wildly \emph{within} one step -- points yielding
+  and unloading from one iteration to the next -- is the classic sign of a
+  load increment too large to resolve the elastic-plastic boundary;
+\item \texttt{Deps.max} is the quantity to watch against the step size. A
+  plastic strain increment of a few percent in one step is too much for
+  most constitutive laws; reduce \texttt{'TEMPS\_CALCULES'} until it is
+  small, and note that \op{pasapas} will subdivide the step itself if it has
+  to;
+\item \texttt{Eps.max} is the accumulated plastic strain. Compare it with the
+  ductility of the material: if it reaches tens of percent, the small-strain
+  assumption of this chapter has stopped being valid and you belong in
+  chapter~\ref{chap:largestrain};
+\item \texttt{Crit.flex} identically zero simply means your model has no
+  rotational degrees of freedom. On a shell model it not converging while
+  \texttt{Critere} does is the signature of a bending problem -- usually too
+  coarse a mesh through the thickness, or a membrane locking issue.
+\end{itemize}
+
+\noindent The algorithms behind all of this -- return mapping, the consistent
+tangent operator, and why the choice of integration scheme governs the
+convergence rate you see in the \texttt{Critere} column -- are the subject of
+Simo and Hughes~\cite{Simo:1998}, which is the standard reference on
+computational plasticity. Dhondt~\cite{Dhondt:2004} covers the same ground
+from the point of view of someone implementing it in a three-dimensional
+code, and is the more practical of the two if you intend to write your own
+constitutive routine.
+
+\begin{codebox}\footnotesize
+\begin{verbatim}
+
+ 
+ ------------------ DEBUT DE LA PROCEDURE PASAPAS ------------------
+ 
+ 
+ Calcul MECANIQUE
+  *** PLASTICITE ***
+  *** CONVERGENCE FORCEE   ***
+ 
+ 
+  Numero du pas :     1     Indice d evolution :   3.0000
+  Iter   Nplas     Critere        Deps.max       Eps.max      Crit.flex
+ Pas d increment de charge, initialisation calculee avec le temps
+ Initialisation a partir de la solution precedente Coeff  0.0000
+     1      35    0.50000         8.40624E-06     2.14937E-03     0.50000
+     2      34    1.17475E-04     8.79403E-06     2.15165E-03     1.17475E-04
+     3      34    8.47313E-05     1.14535E-05     2.15337E-03     8.47313E-05
+  ****** CONVERGENCE A L ITERATION     3
+   
+  Numero du pas :     2     Indice d evolution :   4.0000
+ 
+  Iter   Nplas     Critere        Deps.max       Eps.max      Crit.flex
+     1     248    0.11013         5.67786E-04     2.72116E-03     0.11013
+     2     255    1.42363E-03     7.69312E-04     2.92268E-03     1.42363E-03
+     3     253    9.79151E-04     9.04782E-04     3.05815E-03     9.79151E-04
+ act3 : reduction at 3 dimensions
+     4     250    1.22652E-03     1.18403E-03     3.33740E-03     1.22652E-03
+     5     251    2.00070E-04     1.21039E-03     3.36376E-03     2.00070E-04
+     6     243    2.03488E-04     1.28299E-03     3.43636E-03     2.03488E-04
+     7     240    9.73268E-05     1.29365E-03     3.44703E-03     9.73268E-05
+  ****** CONVERGENCE A L ITERATION     7
+   
+   ....
+   
+   ------------------- FIN DE LA PROCEDURE PASAPAS -------------------
+\end{verbatim}
+\end{codebox}
+
+\noindent The transcript above comes from a different run than the one set up
+here, so do not expect your own step numbers and residuals to match it line
+by line. What matters is the shape: a decreasing \texttt{Critere} and a
+\texttt{CONVERGENCE A L ITERATION} line closing each step. A step that
+reaches the iteration limit without that line, or a \texttt{Critere} that
+stops decreasing, means the step did not converge -- reduce the step size in
+\texttt{'TEMPS\_CALCULES'} before believing the results.
+
+
+\subsubsection*{Analysis of the results}
+
+After the completion of the \texttt{pasapas} computation 
+a series of results can be analysed. 
+
+\begin{castemcom}
+\texttt{list}-ing the contents of \texttt{tabexp} 
+presents the complete list of the entries of the table,
+ranging from computational options and settings to the
+fields of the solution. Some of the important entries 
+are:
+\begin{itemize}
+
+ \item \texttt{deplacements} - the displacement fields 
+ \item \texttt{contraintes} - the stress fields 
+ \item \texttt{variables\_internes} - the  fields of the internal variables of the 
+   constitutive model, its component fields are described in the manual pages 
+   of \texttt{mode[le]} and \texttt{mate[riaux]}, as well as in documents 
+   like~\cite{Pasquet:1998}  
+ \item \texttt{deformations\_inelastiques} - the fields of the inelastic strains 
+
+\end{itemize}
+All these entries are themselves tables indexed by the number of the 
+computed step. The correspondence between steps and time instants 
+can easily be recovered by listing the table of time \texttt{tabexp . temps}.  
+
+The global strain field is not saved in the procedure, but can 
+easily be computed with \texttt{epsi[lon]}.
+
+The computed fields can be displayed  
+using \texttt{trac[er]}, in the usual way, that means 
+appending the mesh for the nodal fields, \texttt{chpoint},  and the 
+model for the fields on elements (\texttt{chamelem}, defined for example at the Gauss points).   
+
+\index{extr[aire]@ \texttt{extr[aire]} extract, ! \texttt{'COMP'}, components    } 
+
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+   list tabexp;
+
+   list tabexp . deplacements ;
+   list tabexp . contraintes ;
+   list tabexp . variables_internes ;
+
+   list tabexp . temps ;
+
+   trace mod_p (tabexp . contraintes . 15);
+   trace dom tabexp . deplacements . 4 ;
+
+   list (extr
+     (tabexp . variables_internes . 5) 'COMP');
+
+
+\end{verbatim}
+\end{castemlines}
+     
+\begin{castemcom}
+If one wants to track the history  of a field at a certain 
+point, one can easily construct the corresponding 
+\texttt{evolution} object.
+
+The \texttt{prog[ramer]} command initiates and then
+constructs by appending the list of values for the time 
+and field evolutions.   
+
+The \texttt{repe[ter], fin} command permits to construct 
+the loop over all time steps. The user defined  string  
+\texttt{loop} is only a flag indicating the start and the 
+end of the loop. This functionality is of importance for 
+intricate loops. \texttt{\&loop} is the iterator of the 
+loop \texttt{loop} and varies from 1 to 
+\texttt{(dime tabexp . deplacements)}. However as 
+the lists in \texttt{tabexp} start with the initial 
+step set at \texttt{0} we insert the new iterator 
+\texttt{ii}.
+
+The use of \texttt{dime[nsion]} permits to extract  automatically  
+the number of time instants.  
+
+Finally let us note the usage of \texttt{extr[aire]}:
+\begin{itemize}
+
+   \item for nodal fields, \texttt{chpoint}'s , like the 
+   displacement or the temperature field, one needs to indicate 
+   the component and the nodal point of extraction, here 
+   \texttt{'UX'} and \texttt{a3} respectively.    
+   
+   \item  for fields defined on elements, \texttt{chamelem}'s , 
+   like the stress or the strain field, one needs to indicate 
+   the component and the numbers of the zone, the element and of the Gauss point of 
+   extraction, here \texttt{'SMXY'} and \texttt{1 30 2} respectively.    
+   
+   In different cases the models are automatically partitioned in zones
+   that indicate for example different types of elements or 
+   material behaviour.  
+
+\end{itemize} 
+ 
+\index{evol[ution]@ \texttt{evol[ution]} ! \texttt{'MANU'}, from lists } 
+\index{extr[aire]@ \texttt{extr[aire]} extract, ! \texttt{chpoint}, nodal field    } 
+\index{extr[aire]@ \texttt{extr[aire]} extract, ! \texttt{chamelem}, field on elements    } 
+\dindex{repe[ter]}{do, start}
+ 
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+   thetime = prog;
+   uuy = prog;
+   sigyy = prog;
+   sigxy = prog;
+   
+   repeter loop (dime tabexp . deplacements);
+   ii = &loop - 1;
+   
+   thetime = thetime et
+             (prog (tabexp . temps . ii));
+   
+   uuy = uuy et (prog (extr
+     (tabexp . deplacements . ii) 'UY' a3));
+   
+   sigyy = sigyy et 
+      (prog (extr
+        (tabexp . contraintes . ii)
+        'SMYY' 1 30 2));
+   sigxy = sigxy et 
+      (prog (extr
+        (tabexp . contraintes . ii)
+        'SMXY' 1 30 2));
+   
+   fin loop;
+   
+\end{verbatim}
+\end{castemlines}
+
+
+\begin{castemcom}
+
+After ending the loop we have retrieved the lists of time and 
+of $u_y$, $\sigma_{xy}$, $\sigma_{yy}$ in the corresponding 
+points. The lists can now be combined into \texttt{evolution}'s
+which can be plotted using the \texttt{dess[iner]} command. 
+ 
+\end{castemcom}
+\begin{castemlines}
+\begin{verbatim}
+
+   ev_uy = evol rouge manu
+       'time' thetime 'uy' uuy;
+   ev_sigyy = evol jaune manu
+       'time' thetime 'stress_yy' sigyy;
+   ev_sigxy = evol vert manu
+       'time' thetime 'stress_xy' sigxy;
+   
+   dess ev_uy;
+   dess (ev_sigyy et ev_sigxy);
+
+\end{verbatim}
+\end{castemlines}
+
+\section*{Summary}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Summary}
+
+A nonlinear computation is two nested loops: an outer loop over load
+increments, and an inner loop that iterates until the residual -- applied
+forces minus $[B^{T}]\sigma$ -- is small compared with the applied forces.
+Writing it out in \textsc{gibiane}, as in section~\ref{sec:plas:incremental},
+takes about forty lines and is worth doing once.
+
+After that, use \op{pasapas}. It performs the same two loops, with a far
+better convergence strategy and automatic step subdivision, and it is driven
+entirely by one \op{table}: you fill \texttt{'MODELE'},
+\texttt{'CARACTERISTIQUES'}, \texttt{'BLOCAGES\_MECANIQUES'},
+\texttt{'CHARGEMENT'} and \texttt{'TEMPS\_CALCULES'}, and it fills
+\texttt{'DEPLACEMENTS'}, \texttt{'CONTRAINTES'} and
+\texttt{'VARIABLES\_INTERNES'} back into the same table, each a sub-table
+indexed by step. That input/output table is the single idea to take away: it
+reappears unchanged for large strain in chapter~\ref{chap:largestrain}.
+
+\section*{Exercises}
+\addcontentsline{toc}{section}{\texorpdfstring{\hskip14mm}{} Exercises}
+
+\begin{enumerate}
+\item \textbf{Hand-written against \op{pasapas}.} Run the incremental
+  algorithm of section~\ref{sec:plas:incremental} and the \op{pasapas} computation of
+  section~\ref{sec:plas:pasapas} on the same square domain, with the same
+  material and the same loading, and compare the stress--strain curves at a
+  Gauss point. They should coincide to within the equilibrium tolerance.
+
+\item \textbf{Cost of the tolerance.} Rerun the hand-written algorithm with
+  \op{tol\_res} equal to $10^{-2}$, $10^{-3}$ and $10^{-5}$, counting the
+  total number of equilibrium iterations. Plot the error on the final stress
+  against the number of iterations.
+
+\item \textbf{Kinematic versus isotropic hardening.} The example uses
+  kinematic hardening. Change the model to isotropic hardening and apply a
+  full load--unload--reload cycle. Which of the two reproduces the
+  Bauschinger effect, and how do you see it on the stress--strain curve?
+
+\item \textbf{Constant versus tangent stiffness.} The algorithm here
+  re-uses the elastic stiffness at every iteration. Estimate how many
+  iterations per step it needs, and discuss what a tangent-stiffness update
+  would change in cost per iteration and in number of iterations.
+\end{enumerate}
