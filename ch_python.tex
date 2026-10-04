@@ -24,9 +24,13 @@ analysing the output, from outside \texttt{Cast3M}. It gives you, in order:
   post-process it (section~\ref{sec:py:fields});
 \item how to drive a parametric study from Python
   (section~\ref{sec:py:param});
-\item and, for those who would rather stay in the shell, how to do the same
-  with a shell script, \texttt{sed} and \texttt{awk}
-  (section~\ref{sec:py:shell}).
+\item for those who would rather stay in the shell, how to do the same
+  with a shell script, \texttt{sed} and \texttt{awk}, in \texttt{bash} or in
+  \texttt{csh} (section~\ref{sec:py:shell});
+\item how to wrap \texttt{Cast3M} as a function of its parameters and hand
+  it to OpenTURNS or JAX (section~\ref{sec:py:drivers});
+\item and where to get these tools on Linux, macOS and Windows
+  (section~\ref{sec:py:install}).
 \end{itemize}
 
 \noindent The last of these is the \emph{pre}-processing half, and it is
@@ -512,6 +516,64 @@ $ for d in run_*; do
 the current line and reads the following one. That last loop is the usual way
 a parameter sweep is reduced to a single file ready for plotting.
 
+\subsection{\texttt{csh}: the same loop in the C shell}
+\label{sec:py:csh}
+
+\cindex{csh}\cindex{tcsh}\cindex{shell script!C shell}%
+Many computing centres, and many older \texttt{Cast3M} installations, still
+give their users the C shell (\texttt{csh}, today always \texttt{tcsh}) as
+login shell, and batch scripts inherited from colleagues are often written in
+it. The loop of the previous pages reads as follows in \texttt{csh}:
+
+\begin{codebox}
+\begin{verbatim}
+#!/bin/csh -f
+# sweep.csh -- the parameter sweep, in C shell
+set castem = castem26
+
+foreach r ( 0.05 0.10 0.20 )
+  foreach nel ( 10 20 40 )
+
+    set tag = "r${r}_n${nel}"
+    mkdir -p "run_$tag"
+
+    sed -e "s/__RADIUS__/$r/" \
+        -e "s/__NEL__/$nel/"  \
+        plate.template > "run_$tag/calcul.dgibi"
+
+    ( cd "run_$tag" && $castem calcul.dgibi >& sortie.log )
+
+    grep -q 'ERREUR' "run_$tag/sortie.log"
+    if ( $status == 0 ) then
+      echo "FAILED: $tag"
+    endif
+
+  end
+end
+\end{verbatim}
+\end{codebox}
+
+\noindent The logic is identical; the differences are of syntax only:
+
+\begin{itemize}
+\item \textbf{loops and tests}: \texttt{foreach \ldots\ end} and
+  \texttt{if ( \ldots\ ) then \ldots\ endif} replace \texttt{for \ldots\ done}
+  and \texttt{if \ldots\ fi};
+\item \textbf{variables} are set with \texttt{set name = value} (spaces
+  allowed), and the exit status of the last command is \texttt{\$status}, not
+  \texttt{\$?};
+\item \textbf{redirection}: \texttt{>\&} sends both the output and the errors
+  to the file, where \texttt{bash} writes \texttt{> file 2>\&1};
+\item the option \texttt{-f} on the first line stops \texttt{csh} from reading
+  your \texttt{.cshrc}, so that the script behaves the same for every user;
+\item there is no \texttt{set -e}: test the result of each important command
+  yourself, as with \texttt{grep} above.
+\end{itemize}
+
+\noindent \texttt{csh} has no functions and an awkward quoting of special
+characters, which is why new scripts are better written for \texttt{bash}.
+Keep \texttt{csh} for reading and adapting what you inherit.
+
 \subsection*{Which tool for which job}
 
 \begin{gbox}{Choosing between them}
@@ -530,6 +592,202 @@ Python & everything structured: interpolation, curve fitting, several tables
 generate the runs, \texttt{awk} reduces the output to a small table, and
 Python takes over from there. Many working setups use all three, and there
 is nothing wrong with that.
+
+\section{\texttt{Cast3M} as a function: OpenTURNS and JAX}
+\label{sec:py:drivers}
+
+\cindex{driver, of a computation}\cindex{black box, Cast3M as}%
+The parametric study of section~\ref{sec:py:param} runs a list of cases
+chosen in advance. An optimizer, a calibration or an uncertainty study
+chooses the next case itself, from the results of the previous ones. All it
+needs is \texttt{Cast3M} wrapped as a \emph{function} of its parameters. Four
+rules make one: a template; one directory per run; a check of the output for
+\texttt{ERREUR}, since the exit status says nothing; and a cache, because an
+optimizer often asks twice for the same point.
+
+\begin{codebox}
+\begin{verbatim}
+import pathlib, subprocess, functools
+import numpy as np
+
+TEMPLATE = pathlib.Path("plate.template").read_text()
+
+@functools.lru_cache(maxsize=None)          # the same r is computed once
+def smax(r):
+    """Largest SMYY (MPa) for a hole of radius r: one Cast3M run."""
+    wd = pathlib.Path("runs") / f"r{r:.6f}"
+    wd.mkdir(parents=True, exist_ok=True)
+    (wd / "calcul.dgibi").write_text(
+        TEMPLATE.replace("__RADIUS__", f"{r:.6f}").replace("__NEL__", "20"))
+    with open(wd / "sortie.log", "w") as log:
+        subprocess.run(["castem26", "calcul.dgibi"], cwd=wd,
+                       stdout=log, stderr=subprocess.STDOUT)
+    if "ERREUR" in (wd / "sortie.log").read_text():
+        raise RuntimeError(f"Cast3M failed in {wd}")
+    data = np.loadtxt(wd / "history.csv", delimiter=";", skiprows=1)
+    return data[:, 1].max() / 1e6
+\end{verbatim}
+\end{codebox}
+
+\noindent Save it as \texttt{drivers.py}: the two examples below import it.
+The template is the one of section~\ref{sec:py:shell}, ending with
+\texttt{EXPORTCSV TEV 'history.csv';}.
+
+\subsection{OpenTURNS: propagating an uncertainty}
+\label{sec:py:openturns}
+
+\cindex{OpenTURNS}\cindex{uncertainty propagation}%
+OpenTURNS, the uncertainty library developed by EDF, Airbus, Phimeca and
+IMACS, sees a model as a function from an input vector to an output vector.
+\texttt{PythonFunction} turns \texttt{smax} into such a model; a probability
+law on the radius then gives a random output, sampled by as many
+\texttt{Cast3M} runs as there are points:
+
+\begin{codebox}
+\begin{verbatim}
+import openturns as ot
+from drivers import smax
+
+model = ot.PythonFunction(1, 1, lambda x: [smax(round(x[0], 6))])
+R = ot.Normal(0.10, 0.005)                  # radius: mean 0.10, 5% scatter
+Y = ot.CompositeRandomVector(model, ot.RandomVector(R))
+ot.RandomGenerator.SetSeed(0)
+sample = Y.getSample(200)                   # 200 Cast3M runs
+print("mean", sample.computeMean()[0],
+      "std", sample.computeStandardDeviation()[0],
+      "99% quantile", sample.computeQuantile(0.99)[0])
+\end{verbatim}
+\end{codebox}
+
+\noindent The same model object serves the rest of the library: Sobol'
+indices when there are several uncertain parameters, a metamodel (polynomial
+chaos, kriging) fitted on a few dozen runs and sampled instead of
+\texttt{Cast3M}, or the calibration of material parameters against
+measurements (\texttt{NonLinearLeastSquaresCalibration}). For the last one, a
+complete example with \texttt{Cast3M} as the model is the identification of
+an elastoplastic truss in the lecture notes \emph{Nonlinear Problems in
+Mechanics} (Chapter~7 and its \texttt{Cast3M} companion). OpenTURNS also has
+its own tools to fill templates and read results,
+\texttt{openturns.coupling\_tools}; the few lines of \texttt{smax} do the
+same, visibly.
+
+\subsection{JAX: a \texttt{Cast3M} run inside a differentiated program}
+\label{sec:py:jax}
+
+\cindex{JAX}\cindex{automatic differentiation}%
+JAX differentiates Python programs written with its \texttt{numpy}
+(\texttt{jax.numpy}). It cannot look inside \texttt{Cast3M}, but it lets you
+\emph{declare} the derivative of a black box: \texttt{jax.pure\_callback}
+calls the external code, \texttt{jax.custom\_vjp} says how to multiply a
+vector by its derivative. Everything written around the black box -- a cost,
+a change of variables, a penalty -- is then differentiated by JAX. Here the
+derivative is a central difference of two runs; a derivative computed by
+\texttt{Cast3M} itself would replace the function \texttt{\_df} and nothing
+else.
+
+\begin{codebox}
+\begin{verbatim}
+import numpy as np, jax, jax.numpy as jnp
+from scipy.optimize import minimize
+from drivers import smax
+jax.config.update("jax_enable_x64", True)
+f64 = jax.ShapeDtypeStruct((), jnp.float64)
+
+def _f(r):                                  # the black box, on numbers
+    return np.float64(smax(round(float(r), 6)))
+
+def _df(r, h=1e-3):                         # its derivative: two runs
+    r = float(r)
+    return np.float64((smax(round(r + h, 6)) - smax(round(r - h, 6))) / (2*h))
+
+@jax.custom_vjp
+def s(r):
+    return jax.pure_callback(_f, f64, r)
+
+s.defvjp(lambda r: (s(r), r),                               # forward
+         lambda r, v: (v * jax.pure_callback(_df, f64, r),)) # backward
+
+target = 2.4                                # wanted max SMYY (MPa)
+cost = lambda r: 0.5 * (s(r) - target) ** 2 # any JAX code around s
+grad = jax.grad(cost)                       # uses the declared derivative
+
+res = minimize(lambda x: float(cost(x[0])), [0.10],
+               jac=lambda x: [float(grad(x[0]))], method="BFGS")
+print("radius", res.x[0], "runs", smax.cache_info().currsize)
+\end{verbatim}
+\end{codebox}
+
+\noindent Check such a gradient before trusting it: compare
+$J(r+h)-J(r)$ with $h\,J'(r)$ for decreasing $h$ -- the difference must
+decrease like $h^2$ (the Taylor test).
+
+\section{Installing the tools}
+\label{sec:py:install}
+
+\cindex{installation, of the tools}%
+\texttt{Cast3M} itself is installed as in section~\ref{sec:intro:install}.
+The tools of this chapter come from elsewhere:
+
+\begin{gbox}{Where each tool comes from}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{22mm}@{\hspace{3mm}}>{\raggedright\arraybackslash}p{38mm}@{\hspace{3mm}}>{\raggedright\arraybackslash}p{36mm}@{\hspace{3mm}}>{\raggedright\arraybackslash}p{38mm}@{}}
+ & \textbf{GNU/Linux} & \textbf{macOS} & \textbf{Windows} \\[1.mm]
+\texttt{bash}, \texttt{sed}, \texttt{awk}
+  & installed & installed (\texttt{bash} 3.2; \texttt{zsh} is the login shell)
+  & WSL2, or Git Bash \\[1.mm]
+\texttt{csh} (\texttt{tcsh})
+  & \texttt{apt install tcsh}, \texttt{dnf install tcsh}
+  & installed (\texttt{/bin/csh})
+  & inside WSL2: \texttt{apt install tcsh} \\[1.mm]
+Python, \texttt{pip}
+  & distribution packages, or Miniforge
+  & \texttt{python.org} installer, or Miniforge
+  & \texttt{python.org} installer, or Miniforge \\[1.mm]
+OpenTURNS
+  & \texttt{pip install openturns}; \texttt{conda install openturns};
+    Debian/Ubuntu and Fedora packages
+  & \texttt{pip} or \texttt{conda}
+  & \texttt{pip} or \texttt{conda} \\[1.mm]
+JAX
+  & \texttt{pip install -U jax} (CPU); \texttt{"jax[cuda13]"} for an NVIDIA GPU
+  & \texttt{pip install -U jax} (Apple silicon, CPU)
+  & \texttt{pip install -U jax} (CPU, experimental); GPU only through WSL2 \\
+\end{tabular}
+\end{gbox}
+
+\noindent Three practical remarks.
+
+\begin{itemize}
+\item \textbf{Use one Python environment per project}, so that a library
+  upgraded for another project does not break this one:
+\begin{codebox}
+\begin{verbatim}
+$ python3 -m venv ~/venv/castem          # once
+$ source ~/venv/castem/bin/activate      # bash/zsh; csh: activate.csh
+$ pip install numpy scipy pandas matplotlib openturns jax
+\end{verbatim}
+\end{codebox}
+  With Miniforge, \texttt{conda create -n castem -c conda-forge python
+  openturns jax} does the same; OpenTURNS recommends Miniforge (conda-forge)
+  rather than the Anaconda channels.
+\item \textbf{On Windows, script from WSL2.} The shell drivers need a Unix
+  shell; WSL2 (\texttt{wsl --install} in an administrator terminal) gives a
+  Ubuntu system inside Windows, in which the Linux version of \texttt{Cast3M},
+  the shells and all the Python libraries install as on Linux. The Python
+  drivers also run in a native Windows Python, provided the \texttt{Cast3M}
+  command they call is on the \texttt{PATH}: check its name in the shortcut
+  the installer created.
+\item \textbf{Test the drivers without \texttt{Cast3M}.} A small script that
+  reads \texttt{calcul.dgibi} and writes the CSV file \texttt{Cast3M} would
+  write, from a formula, is enough to develop a driver on a laptop or in a
+  continuous-integration service where \texttt{Cast3M} is not installed.
+  Name it \texttt{castem26}, put it first on the \texttt{PATH}, and replace
+  it by the real code when the driver works.
+\end{itemize}
+
+\noindent The scripts of sections~\ref{sec:py:csh} to~\ref{sec:py:jax} were run
+with \texttt{tcsh}~6.24, Python~3.13, OpenTURNS~1.27 and JAX~0.11, against
+such a stand-in, not against a \texttt{Cast3M} installation.
 
 \framepart{Summary}
 
@@ -550,6 +808,14 @@ is nothing wrong with that.
   \texttt{fort.98} make that compulsory -- and \texttt{awk} reduces the
   results to one table. Python takes over wherever the analysis stops being
   column arithmetic.
+  \item \textbf{\texttt{csh} for what you inherit, \texttt{bash} for what
+  you write.} The loop is the same; only the syntax of loops, tests and
+  redirections changes.
+  \item \textbf{\texttt{Cast3M} as a function}: a template, a directory per
+  run, a check for \texttt{ERREUR} and a cache make it usable by any driver --
+  OpenTURNS for uncertainties and calibration, JAX when the cost around it is
+  a program to differentiate, with the derivative of the black box declared by
+  \texttt{custom\_vjp}.
   \item \textbf{The real gain is not the prettier picture}: it is that the
   whole study becomes a script. Rerun the computation, rerun the script, and
   every figure in your report updates.
@@ -581,3 +847,19 @@ is nothing wrong with that.
   \texttt{sample\_over\_line} to plot $\sigma_{yy}$ along the same physical
   path for both. This is a comparison the built-in \op{evol} cannot make,
   since the two meshes have different nodes.
+
+\exercise{The sweep in C shell} Rewrite the \texttt{bash} script of your
+  convergence study in \texttt{csh}, run both, and compare the two tables
+  line by line with \texttt{diff}.
+
+\exercise{Scatter of the stress concentration} With the OpenTURNS example of
+  section~\ref{sec:py:openturns}, compute the mean and the 99\% quantile of the
+  maximum stress for a radius of 5\% scatter. Then fit a polynomial chaos on
+  20 runs (\texttt{FunctionalChaosAlgorithm}) and compare the same two
+  numbers, computed on $10^5$ points of the metamodel.
+
+\exercise{Checking a declared derivative} In the JAX example of
+  section~\ref{sec:py:jax}, compute $e_1(h)=\abs{J(r+h)-J(r)-h\,J'(r)}$ for
+  $h=10^{-1},\dots,10^{-4}$ and plot it on logarithmic axes. Where does the
+  slope 2 stop, and why does the step of the difference in \texttt{\_df}
+  decide it?
